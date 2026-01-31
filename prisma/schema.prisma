@@ -235,10 +235,15 @@ model Notification {
 
 // -------- TEACHER INVITATION --------
 
-model TeacherInvitation {
-  id        String           @id @default(auto()) @map("_id") @db.ObjectId
-  email     String           @unique
-  token     String           @unique
-  status    InvitationStatus @default(PENDING)
-  createdAt DateTime         @default(now())
+model Invite {
+  id         String           @id @default(auto()) @map("_id") @db.ObjectId
+  email      String           @unique
+  token      String           @unique
+  role       Role             @default(TEACHER)
+  status     InvitationStatus @default(PENDING)
+  createdAt  DateTime         @default(now())
+  expiresAt  DateTime
+  acceptedAt DateTime?
+
+  @@index([status, expiresAt])
 }
