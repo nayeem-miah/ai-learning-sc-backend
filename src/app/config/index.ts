@@ -48,5 +48,7 @@ export default {
     password: process.env.ADMIN_PASSWORD,
   },
 
+  clientUrl: process.env.CLIENT_URL || "http://localhost:3000",
+
   salt_rounds: Number(process.env.BCRYPT_SALT_ROUNDS) || 10,
 };
