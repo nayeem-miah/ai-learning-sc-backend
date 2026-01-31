@@ -1,0 +1,244 @@
+// ===============================
+// Prisma Schema (AI Learning App)
+// ===============================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// -------- ENUMS --------
+
+enum Role {
+  STUDENT
+  TEACHER
+  ADMIN
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+}
+
+enum ContentType {
+  VIDEO
+  TEXT
+  INTERACTIVE
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum NotificationType {
+  REMINDER
+  EXAM
+  SYSTEM
+}
+
+enum Status {
+  ACTIVE
+  INACTIVE
+}
+
+// -------- USER --------
+
+model User {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  firstName      String
+  lastName       String
+  email          String   @unique
+  password       String
+  profilePicture String?
+  role           Role     @default(STUDENT)
+  status         Status   @default(ACTIVE)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  studentProfile StudentProfile?
+  teacherProfile TeacherProfile?
+
+  enrollments    Enrollment[]
+  lessonProgress LessonProgress[]
+  quizAttempts   QuizAttempt[]
+  notifications  Notification[]
+  courses        Course[]
+}
+
+// -------- STUDENT PROFILE --------
+
+model StudentProfile {
+  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId              String   @unique @db.ObjectId
+  gradeLevel          String
+  interests           String[]
+  learningPreferences String[]
+  goals               String?
+  currentLevel        String?
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+// -------- TEACHER PROFILE --------
+
+model TeacherProfile {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @unique @db.ObjectId
+  expertise String[]
+  bio       String?
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+// -------- COURSE --------
+
+model Course {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String
+  level       String
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  teacherId String @db.ObjectId
+  teacher   User   @relation(fields: [teacherId], references: [id])
+
+  lessons     Lesson[]
+  enrollments Enrollment[]
+}
+
+// -------- LESSON --------
+
+model Lesson {
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId
+  courseId    String      @db.ObjectId
+  title       String
+  contentType ContentType
+  videoUrl    String?
+  textContent String?
+  order       Int
+  hasQuiz     Boolean     @default(true)
+
+  course   Course           @relation(fields: [courseId], references: [id])
+  quiz     Quiz?
+  progress LessonProgress[]
+}
+
+// -------- QUIZ --------
+
+model Quiz {
+  id         String  @id @default(auto()) @map("_id") @db.ObjectId
+  lessonId   String  @unique @db.ObjectId
+  title      String
+  isAdaptive Boolean @default(false)
+
+  lesson    Lesson        @relation(fields: [lessonId], references: [id])
+  questions Question[]
+  attempts  QuizAttempt[]
+}
+
+// -------- QUESTION --------
+
+model Question {
+  id            String     @id @default(auto()) @map("_id") @db.ObjectId
+  quizId        String     @db.ObjectId
+  questionText  String
+  options       String[]
+  correctAnswer String
+  difficulty    Difficulty
+  explanation   String?
+
+  quiz Quiz @relation(fields: [quizId], references: [id])
+}
+
+// -------- LESSON PROGRESS (NO SKIP) --------
+
+model LessonProgress {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  studentId   String    @db.ObjectId
+  lessonId    String    @db.ObjectId
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+
+  student User   @relation(fields: [studentId], references: [id])
+  lesson  Lesson @relation(fields: [lessonId], references: [id])
+
+  @@unique([studentId, lessonId])
+}
+
+// -------- QUIZ ATTEMPT --------
+
+model QuizAttempt {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  studentId   String   @db.ObjectId
+  quizId      String   @db.ObjectId
+  score       Int
+  passed      Boolean
+  attemptedAt DateTime @default(now())
+
+  student User @relation(fields: [studentId], references: [id])
+  quiz    Quiz @relation(fields: [quizId], references: [id])
+}
+
+// -------- ENROLLMENT --------
+
+model Enrollment {
+  id                 String  @id @default(auto()) @map("_id") @db.ObjectId
+  studentId          String  @db.ObjectId
+  courseId           String  @db.ObjectId
+  progressPercentage Float   @default(0)
+  currentLessonId    String? @db.ObjectId
+
+  student User   @relation(fields: [studentId], references: [id])
+  course  Course @relation(fields: [courseId], references: [id])
+
+  @@unique([studentId, courseId])
+}
+
+// -------- BADGE --------
+
+model Badge {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String
+  icon        String
+}
+
+model StudentBadge {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  studentId String   @db.ObjectId
+  badgeId   String   @db.ObjectId
+  earnedAt  DateTime @default(now())
+}
+
+// -------- NOTIFICATION --------
+
+model Notification {
+  id        String           @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String           @db.ObjectId
+  title     String
+  message   String
+  type      NotificationType
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+// -------- TEACHER INVITATION --------
+
+model TeacherInvitation {
+  id        String           @id @default(auto()) @map("_id") @db.ObjectId
+  email     String           @unique
+  token     String           @unique
+  status    InvitationStatus @default(PENDING)
+  createdAt DateTime         @default(now())
+}
