@@ -29,12 +29,13 @@ const getAllClasses = catchAsync(async (req: Request, res: Response) => {
 const deleteClass = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
 
-  await ClassService.deleteClass(id);
+  const result = await ClassService.deleteClass(id);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: "Class deleted successfully",
+    data: result,
   });
 });
 

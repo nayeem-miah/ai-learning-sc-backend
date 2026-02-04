@@ -67,9 +67,11 @@ const deleteClass = async (id: string) => {
     throw new ApiError(httpStatus.NOT_FOUND, "Class not found");
   }
 
-  await prisma.class.delete({
+  const data = await prisma.class.delete({
     where: { id },
   });
+
+  return data;
 };
 
 export const ClassService = {
