@@ -26,7 +26,6 @@ enum InvitationStatus {
 }
 
 enum ContentType {
-  VIDEO
   TEXT
   INTERACTIVE
 }
@@ -71,14 +70,16 @@ model User {
   quizAttempts   QuizAttempt[]
   notifications  Notification[]
   courses        Course[]
+  studentClasses StudentClass[]
 }
 
 // -------- STUDENT PROFILE --------
 
 model StudentProfile {
-  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId              String   @unique @db.ObjectId
-  gradeLevel          String
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String @unique @db.ObjectId
+  gradeLevel String
+
   interests           String[]
   learningPreferences String[]
   goals               String?
@@ -98,21 +99,90 @@ model TeacherProfile {
   user User @relation(fields: [userId], references: [id])
 }
 
+enum CourseType {
+  SEMESTER
+  FULL_YEAR
+}
+
 // -------- COURSE --------
 
 model Course {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  title       String
-  description String
-  level       String
-  isPublished Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  id String @id @default(auto()) @map("_id") @db.ObjectId
 
+  title       String
+  subject     String
+  description String?
+  level       String
+  isPublished Boolean @default(false)
+
+  // ===== Course Duration =====
+  courseType    CourseType // SEMESTER | FULL_YEAR
+  semesterCount Int? // only for FULL_YEAR
+
+  quizzesPerModule   Int
+  totalQuizQuestions Int
+  hasMidterm         Boolean @default(false)
+  hasFinal           Boolean @default(false)
+
+  // ===== Learning Benchmarks =====
+  masteryRequirement     Int // percentage (e.g. 75)
+  totalModules           Int
+  estimatedClassDuration Int // minutes per class
+
+  // ===== AI / System Flags =====
+  diagnosticTest   Boolean @default(false)
+  retestingAllowed Boolean @default(false)
+  retestingCount   Int?
+
+  // ===== Relations =====
   teacherId String @db.ObjectId
   teacher   User   @relation(fields: [teacherId], references: [id])
 
   lessons     Lesson[]
   enrollments Enrollment[]
+
+  // ===== Timestamps =====
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  class     Class?   @relation(fields: [classId], references: [id])
+  classId   String?  @db.ObjectId
+}
+
+enum ClassStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+model Class {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  gradeLevel String
+  status     ClassStatus @default(ACTIVE)
+
+  // Relations
+  students      StudentClass[]
+  courses       Course[]
+  totalStudents Int            @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([gradeLevel]) // Grade 9 + A duplicate hobe na
+}
+
+model StudentClass {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  studentId String @db.ObjectId
+  classId   String @db.ObjectId
+
+  joinedAt DateTime @default(now())
+  isActive Boolean  @default(true)
+
+  student User  @relation(fields: [studentId], references: [id])
+  class   Class @relation(fields: [classId], references: [id])
+
+  @@unique([studentId, classId])
 }
 
 // -------- LESSON --------
