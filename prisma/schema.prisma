@@ -247,3 +247,5 @@ model Invite {
 
   @@index([status, expiresAt])
 }
+
+// ===============================
