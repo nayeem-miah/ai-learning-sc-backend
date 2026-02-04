@@ -15,7 +15,6 @@ router.post(
   validateRequest(userValidation.createStudentValidationSchema),
   UserController.registerStudent,
 );
-
 router.patch(
   "/update-profile",
   fileUpload.upload.single("file"),
