@@ -51,6 +51,15 @@ const login = async (payload: { email: string; password: string }) => {
   return {
     accessToken,
     refreshToken,
+    user: {
+      id: user.id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      role: user.role,
+      profilePicture: user.profilePicture,
+      status: user.status,
+    },
   };
 };
 
