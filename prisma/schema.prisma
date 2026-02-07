@@ -319,3 +319,366 @@ model Invite {
 }
 
 // ===============================
+
+// full schema is
+// prisma/schema.prisma
+
+// enum CourseLevel {
+//   GRADE_6
+//   GRADE_7
+//   GRADE_8
+//   GRADE_9
+//   GRADE_10
+//   GRADE_11
+//   GRADE_12
+// }
+
+// enum CourseStatus {
+//   DRAFT
+//   PUBLISHED
+//   ARCHIVED
+// }
+
+// enum LessonType {
+//   READING
+//   ASSIGNMENT
+//   LIVE_CLASS
+// }
+
+// enum QuestionType {
+//   MCQ_SINGLE
+//   MCQ_MULTI
+//   TRUE_FALSE
+//   SHORT_TEXT
+// }
+
+// enum AttemptStatus {
+//   STARTED
+//   SUBMITTED
+//   GRADED
+// }
+
+// enum AttendanceStatus {
+//   PRESENT
+//   LATE
+//   ABSENT
+// }
+
+// model User {
+//   id           String       @id @default(auto()) @map("_id") @db.ObjectId
+//   role         Role         @default(STUDENT)
+//   name         String
+//   email        String       @unique
+//   password     String?
+//   profileImage String?
+//   gradeLevel   CourseLevel?
+
+//   isActive  Boolean  @default(true)
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime @updatedAt
+
+//   // teacher authored courses
+//   coursesAuthored Course[] @relation("TeacherCourses")
+
+//   // enrollments (student->courses)
+//   enrollments Enrollment[]
+
+//   // learning tracking
+//   lessonCompletions LessonCompletion[]
+//   quizAttempts      QuizAttempt[]
+//   progressSnapshots ProgressSnapshot[]
+//   studySessions     StudySession[]
+//   attendanceRecords AttendanceRecord[]
+
+//   @@index([role])
+//   @@index([email])
+// }
+
+// model Course {
+//   id          String       @id @default(auto()) @map("_id") @db.ObjectId
+//   title       String
+//   subject     String
+//   description String?
+//   level       CourseLevel
+//   status      CourseStatus @default(DRAFT)
+
+//   // settings for gating / mastery
+//   masteryRequirement     Int @default(75) // pass threshold %
+//   quizzesPerModule       Int @default(1)
+//   totalModules           Int @default(1)
+//   estimatedClassDuration Int @default(45) // minutes
+
+//   // ownership
+//   teacherId String? @db.ObjectId
+//   teacher   User?   @relation("TeacherCourses", fields: [teacherId], references: [id])
+
+//   // structure
+//   modules     Module[]
+//   enrollments Enrollment[]
+
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime @updatedAt
+
+//   @@index([status])
+//   @@index([level, subject])
+//   @@index([teacherId])
+// }
+
+// model Module {
+//   id       String @id @default(auto()) @map("_id") @db.ObjectId
+//   courseId String @db.ObjectId
+//   course   Course @relation(fields: [courseId], references: [id])
+
+//   title       String
+//   description String?
+//   order       Int
+
+//   lessons Lesson[]
+//   quizzes Quiz[]
+
+//   // optional gating: unlock after moduleOrder-1 completed
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime @updatedAt
+
+//   @@unique([courseId, order])
+//   @@index([courseId])
+// }
+
+// model Lesson {
+//   id       String @id @default(auto()) @map("_id") @db.ObjectId
+//   moduleId String @db.ObjectId
+//   module   Module @relation(fields: [moduleId], references: [id])
+
+//   title    String
+//   type     LessonType
+//   order    Int
+//   duration Int? // minutes
+//   content  String? // html/markdown/text
+
+//   attachmentUrl String? // pdf, etc
+
+//   completions LessonCompletion[]
+
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime @updatedAt
+
+//   @@unique([moduleId, order])
+//   @@index([moduleId])
+// }
+
+// model Quiz {
+//   id       String @id @default(auto()) @map("_id") @db.ObjectId
+//   moduleId String @db.ObjectId
+//   module   Module @relation(fields: [moduleId], references: [id])
+
+//   title            String
+//   order            Int
+//   timeLimit        Int? // minutes
+//   passScore        Int     @default(75) // %
+//   maxAttempts      Int     @default(3)
+//   retestingAllowed Boolean @default(true)
+
+//   questions Question[]
+//   attempts  QuizAttempt[]
+
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime @updatedAt
+
+//   @@unique([moduleId, order])
+//   @@index([moduleId])
+// }
+
+// model Question {
+//   id     String @id @default(auto()) @map("_id") @db.ObjectId
+//   quizId String @db.ObjectId
+//   quiz   Quiz   @relation(fields: [quizId], references: [id])
+
+//   type        QuestionType @default(MCQ_SINGLE)
+//   prompt      String
+//   explanation String? // teacher feedback/explain
+//   points      Int          @default(1)
+//   order       Int
+
+//   options AnswerOption[]
+//   answers QuizAttemptAnswer[]
+
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime @updatedAt
+
+//   @@unique([quizId, order])
+//   @@index([quizId])
+// }
+
+// model AnswerOption {
+//   id         String   @id @default(auto()) @map("_id") @db.ObjectId
+//   questionId String   @db.ObjectId
+//   question   Question @relation(fields: [questionId], references: [id])
+
+//   text      String
+//   isCorrect Boolean @default(false)
+//   order     Int
+
+//   createdAt DateTime @default(now())
+
+//   @@unique([questionId, order])
+//   @@index([questionId])
+// }
+
+// model Enrollment {
+//   id        String @id @default(auto()) @map("_id") @db.ObjectId
+//   studentId String @db.ObjectId
+//   courseId  String @db.ObjectId
+
+//   student User   @relation(fields: [studentId], references: [id])
+//   course  Course @relation(fields: [courseId], references: [id])
+
+//   isActive Boolean @default(true)
+
+//   // cached stats for dashboard cards
+//   progressPercent Int       @default(0)
+//   masteryPercent  Int       @default(0)
+//   lastAccessedAt  DateTime?
+
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime @updatedAt
+
+//   @@unique([studentId, courseId])
+//   @@index([studentId])
+//   @@index([courseId])
+// }
+
+// model LessonCompletion {
+//   id        String @id @default(auto()) @map("_id") @db.ObjectId
+//   studentId String @db.ObjectId
+//   lessonId  String @db.ObjectId
+
+//   student User   @relation(fields: [studentId], references: [id])
+//   lesson  Lesson @relation(fields: [lessonId], references: [id])
+
+//   completedAt  DateTime @default(now())
+//   // anti-cheat / analytics
+//   timeSpentSec Int? // how long they stayed
+//   source       String? // web/mobile etc
+
+//   @@unique([studentId, lessonId])
+//   @@index([studentId])
+//   @@index([lessonId])
+// }
+
+// model QuizAttempt {
+//   id        String @id @default(auto()) @map("_id") @db.ObjectId
+//   studentId String @db.ObjectId
+//   quizId    String @db.ObjectId
+
+//   student User @relation(fields: [studentId], references: [id])
+//   quiz    Quiz @relation(fields: [quizId], references: [id])
+
+//   attemptNo Int
+//   status    AttemptStatus @default(STARTED)
+
+//   startedAt   DateTime  @default(now())
+//   submittedAt DateTime?
+//   gradedAt    DateTime?
+
+//   scorePercent   Int     @default(0)
+//   correctCount   Int     @default(0)
+//   totalQuestions Int     @default(0)
+//   passed         Boolean @default(false)
+
+//   answers QuizAttemptAnswer[]
+
+//   teacherFeedback String?
+
+//   @@unique([studentId, quizId, attemptNo])
+//   @@index([studentId])
+//   @@index([quizId])
+// }
+
+// model QuizAttemptAnswer {
+//   id         String @id @default(auto()) @map("_id") @db.ObjectId
+//   attemptId  String @db.ObjectId
+//   questionId String @db.ObjectId
+
+//   attempt  QuizAttempt @relation(fields: [attemptId], references: [id])
+//   question Question    @relation(fields: [questionId], references: [id])
+
+//   // store selected option(s) for MCQ, or text for SHORT_TEXT
+//   selectedOptionIds String[] @db.ObjectId
+//   textAnswer        String?
+
+//   isCorrect    Boolean @default(false)
+//   pointsEarned Int     @default(0)
+
+//   @@unique([attemptId, questionId])
+//   @@index([attemptId])
+//   @@index([questionId])
+// }
+
+// model ProgressSnapshot {
+//   id        String @id @default(auto()) @map("_id") @db.ObjectId
+//   studentId String @db.ObjectId
+//   courseId  String @db.ObjectId
+
+//   student User   @relation(fields: [studentId], references: [id])
+//   course  Course @relation(fields: [courseId], references: [id])
+
+//   overallMasteryPercent Int @default(0)
+//   courseProgressPercent Int @default(0)
+//   modulesCompleted      Int @default(0)
+//   lessonsCompleted      Int @default(0)
+//   quizzesPassed         Int @default(0)
+
+//   weekLabel String? // e.g. "2026-W05"
+//   createdAt DateTime @default(now())
+
+//   @@index([studentId, courseId])
+// }
+
+// model StudySession {
+//   id        String  @id @default(auto()) @map("_id") @db.ObjectId
+//   studentId String  @db.ObjectId
+//   courseId  String? @db.ObjectId
+//   lessonId  String? @db.ObjectId
+
+//   student User @relation(fields: [studentId], references: [id])
+
+//   startedAt   DateTime  @default(now())
+//   endedAt     DateTime?
+//   durationSec Int       @default(0)
+
+//   @@index([studentId])
+//   @@index([courseId])
+//   @@index([lessonId])
+// }
+
+// model ClassSession {
+//   id       String @id @default(auto()) @map("_id") @db.ObjectId
+//   courseId String @db.ObjectId
+//   course   Course @relation(fields: [courseId], references: [id])
+
+//   title      String
+//   startsAt   DateTime
+//   endsAt     DateTime
+//   meetingUrl String?
+
+//   attendance AttendanceRecord[]
+
+//   @@index([courseId])
+//   @@index([startsAt])
+// }
+
+// model AttendanceRecord {
+//   id             String @id @default(auto()) @map("_id") @db.ObjectId
+//   studentId      String @db.ObjectId
+//   classSessionId String @db.ObjectId
+
+//   student      User         @relation(fields: [studentId], references: [id])
+//   classSession ClassSession @relation(fields: [classSessionId], references: [id])
+
+//   status   AttendanceStatus @default(PRESENT)
+//   markedAt DateTime         @default(now())
+
+//   @@unique([studentId, classSessionId])
+//   @@index([studentId])
+//   @@index([classSessionId])
+// }
