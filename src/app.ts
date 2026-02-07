@@ -9,25 +9,27 @@ const app: Application = express();
 
 // Webhook must be before other middleware
 
-
-app.use(cors({
-    origin: ["http://localhost:3000", "http://localhost:5173"],
+app.use(
+  cors({
+    origin: [
+      "http://localhost:3000",
+      "http://localhost:7270",
+      "http://206.162.244.131:7270",
+    ],
     credentials: true,
-}));
+  }),
+);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-
-
-
 app.get("/", (req: Request, res: Response) => {
-    res.status(200).json({
-        success: true,
-        statusCode: 200,
-        message: "Welcome to scottfriedman API",
-    });
+  res.status(200).json({
+    success: true,
+    statusCode: 200,
+    message: "Welcome to scottfriedman API",
+  });
 });
 
 app.set("trust proxy", 1);
