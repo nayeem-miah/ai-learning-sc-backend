@@ -219,6 +219,48 @@ model Quiz {
   attempts  QuizAttempt[]
 }
 
+model QuizAttempt {
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  studentId String @db.ObjectId
+  quizId    String @db.ObjectId
+
+  total    Int
+  correct  Int
+  wrong    Int
+  accuracy Int
+  points   Int?
+
+  passed      Boolean  @default(false)
+  attemptedAt DateTime @default(now())
+
+  student User @relation(fields: [studentId], references: [id])
+  quiz    Quiz @relation(fields: [quizId], references: [id])
+
+  answers QuizAttemptAnswer[]
+
+  // একবারই দিতে চাইলে uncomment:
+  // @@unique([studentId, quizId])
+
+  @@index([studentId])
+  @@index([quizId])
+}
+
+model QuizAttemptAnswer {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  attemptId  String @db.ObjectId
+  questionId String @db.ObjectId
+
+  selectedOption String?
+  correctOption  String
+  isCorrect      Boolean
+  explanation    String?
+
+  attempt QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@index([attemptId])
+  @@index([questionId])
+}
+
 // -------- QUESTION --------
 
 model Question {
@@ -249,21 +291,7 @@ model LessonProgress {
   @@unique([studentId, lessonId])
 }
 
-// -------- QUIZ ATTEMPT --------
-
-model QuizAttempt {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  studentId   String   @db.ObjectId
-  quizId      String   @db.ObjectId
-  score       Int
-  passed      Boolean
-  attemptedAt DateTime @default(now())
-
-  student User @relation(fields: [studentId], references: [id])
-  quiz    Quiz @relation(fields: [quizId], references: [id])
-}
-
-// -------- ENROLLMENT --------
+//
 
 model Enrollment {
   id                 String  @id @default(auto()) @map("_id") @db.ObjectId
