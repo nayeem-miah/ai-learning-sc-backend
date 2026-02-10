@@ -14,7 +14,7 @@ app.use(
     origin: [
       "http://localhost:3000",
       "http://localhost:7270",
-      "http://206.162.244.131:7270",
+      "http://206.162.244.134:7270",
     ],
     credentials: true,
   }),
