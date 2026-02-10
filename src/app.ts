@@ -9,13 +9,20 @@ const app: Application = express();
 
 // Webhook must be before other middleware
 
+// app.use(
+//   cors({
+//     origin: [
+//       "http://localhost:3000",
+//       "http://localhost:7270",
+//       "http://206.162.244.134:7270",
+//     ],
+//     credentials: true,
+//   }),
+// );
+
 app.use(
   cors({
-    origin: [
-      "http://localhost:3000",
-      "http://localhost:7270",
-      "http://206.162.244.134:7270",
-    ],
+    origin: true,
     credentials: true,
   }),
 );
