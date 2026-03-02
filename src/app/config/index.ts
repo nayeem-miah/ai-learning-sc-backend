@@ -48,7 +48,7 @@ export default {
     password: process.env.ADMIN_PASSWORD,
   },
 
-  clientUrl: process.env.CLIENT_URL || "http://localhost:3000",
+  clientUrl: process.env.CLIENT_URL || "https://scottfriedman12.vercel.app",
 
   salt_rounds: Number(process.env.BCRYPT_SALT_ROUNDS) || 10,
 

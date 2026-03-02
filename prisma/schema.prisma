@@ -91,10 +91,11 @@ model StudentProfile {
 // -------- TEACHER PROFILE --------
 
 model TeacherProfile {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String   @unique @db.ObjectId
-  expertise String[]
-  bio       String?
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String   @unique @db.ObjectId
+  expertise    String[]
+  bio          String?
+  subjectsType String[]
 
   user User @relation(fields: [userId], references: [id])
 }

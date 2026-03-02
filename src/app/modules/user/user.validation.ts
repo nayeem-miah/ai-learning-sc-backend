@@ -12,7 +12,7 @@ export const createStudentValidationSchema = z.object({
     gradeLevel: z.string().min(1, "Grade level is required"),
 
     interests: z.array(z.string()).optional(),
-
+    subjectsType: z.array(z.string()).optional(),
     learningPreferences: z.array(z.string()).optional(),
 
     goals: z.string().optional(),
@@ -47,6 +47,7 @@ export const registerTeacherValidationSchema = z.object({
     email: z.string().email("Invalid email address"),
     password: z.string().min(6, "Password must be at least 6 characters"),
     token: z.string().min(1, "Invitation token is required"),
+    subjectsType: z.array(z.string()).optional(),
     expertise: z.array(z.string()).optional(),
     bio: z.string().optional(),
   }),
