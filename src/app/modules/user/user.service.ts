@@ -227,6 +227,140 @@ const deleteMe = async (userId: string) => {
   return result;
 };
 
+
+const createUserLink = async (loggedInUserId: string, email: string, password: string) => {
+  if (!email || !password) {
+    throw new ApiError(400, "Email and password are required");
+  }
+
+  const targetUser = await prisma.user.findUniqueOrThrow({
+    where: { email },
+  });
+
+  if (!targetUser) {
+    throw new ApiError(404, "User not found");
+  }
+
+  const isMatch = await bcrypt.compare(password, targetUser.password);
+  if (!isMatch) {
+    throw new ApiError(401, "Invalid password");
+  }
+
+  const targetUserId = targetUser.id;
+
+  if (loggedInUserId === targetUserId) {
+    throw new Error("You cannot link yourself");
+  }
+
+  // check already linked
+  const existing = await prisma.userLink.findUnique({
+    where: {
+      fromId_toId: {
+        fromId: loggedInUserId,
+        toId: targetUserId,
+      },
+    },
+  });
+
+  if (existing) {
+    throw new ApiError(401, "Already linked");
+  }
+
+  // create mutual link
+  const userLink = await prisma.userLink.create({
+    data: {
+      fromId: loggedInUserId,
+      toId: targetUserId,
+    },
+  });
+
+  await prisma.userLink.create({
+    data: {
+      fromId: targetUserId,
+      toId: loggedInUserId,
+    },
+  });
+
+  return userLink;
+};
+
+
+const removeUserLink = async (loggedInUserId: string, targetUserId: string) => {
+  await prisma.userLink.deleteMany({
+    where: {
+      OR: [
+        { fromId: loggedInUserId, toId: targetUserId },
+        { fromId: targetUserId, toId: loggedInUserId },
+      ],
+    },
+  });
+
+  return { message: "User unlinked successfully" };
+};
+
+const getLinkedUsers = async (loggedInUserId: string) => {
+
+  const loggedInUser = await prisma.user.findUnique({
+    where: { id: loggedInUserId },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      profilePicture: true,
+      role: true,
+      status: true,
+      isActive: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+
+
+  const links = await prisma.userLink.findMany({
+    where: {
+      OR: [
+        { fromId: loggedInUserId },
+        { toId: loggedInUserId },
+      ],
+    },
+    include: {
+      from: true,
+      to: true,
+    },
+  });
+
+
+  const connectedUsers = links.map(link => {
+    if (link.fromId === loggedInUserId) {
+      return link.to;
+    } else {
+      return link.from;
+    }
+  });
+
+
+  const safeConnectedUsers = connectedUsers.map(user => ({
+    id: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.email,
+    profilePicture: user.profilePicture,
+    role: user.role,
+    status: user.status,
+    isActive: user.isActive,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  }));
+
+  return {
+    loggedInUser,
+    linkedUsers: safeConnectedUsers,
+  };
+};
+
+
+
 export const UserService = {
   registerStudent,
   getAllStudents,
@@ -236,4 +370,7 @@ export const UserService = {
   getMyProfile,
   deleteMe,
   toggleUserRole,
+  createUserLink,
+  removeUserLink,
+  getLinkedUsers,
 };

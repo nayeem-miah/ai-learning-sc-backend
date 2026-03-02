@@ -130,6 +130,56 @@ const deleteMe = catchAsync(
   },
 );
 
+const createUserLink = catchAsync(async (req: Request & { user?: any }, res: Response) => {
+  const userId = req.user.userId;
+  const { email, password } = req.body;
+
+  const result = await UserService.createUserLink(
+    userId,
+    email,
+    password
+  );
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "User link created successfully",
+    data: result,
+  });
+});
+
+
+const removeUserLink = catchAsync(async (req: Request & { user?: any }, res: Response) => {
+  const userId = req.user.userId;
+  const { targetUserId } = req.params;
+
+  const result = await UserService.removeUserLink(
+    userId,
+    targetUserId
+  );
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: result.message,
+  });
+
+})
+
+const getLinkedUsers = catchAsync(async (req: Request & { user?: any }, res: Response) => {
+  const userId = req.user.userId;
+
+  const users = await UserService.getLinkedUsers(userId);
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Linked users fetched successfully",
+    data: users,
+  });
+})
+
+
 export const UserController = {
   registerStudent,
   getAllStudents,
@@ -139,4 +189,7 @@ export const UserController = {
   getMyProfile,
   toggleUserRole,
   deleteMe,
+  createUserLink,
+  removeUserLink,
+  getLinkedUsers
 };

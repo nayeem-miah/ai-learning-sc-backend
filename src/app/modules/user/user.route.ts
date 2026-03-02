@@ -21,6 +21,27 @@ router.patch(
   auth(Role.STUDENT, Role.ADMIN),
   UserController.updateProfile,
 );
+
+router.post(
+  "/linked-users",
+  auth(Role.STUDENT, Role.ADMIN),
+  // validateRequest(userValidation.createUserLinkSchema),
+  UserController.createUserLink
+);
+
+router.get(
+  "/linked-users",
+  auth(Role.STUDENT, Role.ADMIN),
+  UserController.getLinkedUsers
+);
+
+router.delete(
+  "/linked-users/:targetUserId",
+  auth(Role.STUDENT, Role.ADMIN),
+  // validateRequest(userValidation.removeUserLinkSchema),
+  UserController.removeUserLink
+);
+
 // Student CRUD
 router.get("/", auth(), UserController.getAllStudents);
 router.get("/me", auth(), UserController.getMyProfile);

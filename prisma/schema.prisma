@@ -71,6 +71,23 @@ model User {
   notifications  Notification[]
   courses        Course[]
   studentClasses StudentClass[]
+
+  linksFrom UserLink[] @relation("FromUser")
+  linksTo   UserLink[] @relation("ToUser")
+}
+
+model UserLink {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  fromId String @db.ObjectId
+  toId   String @db.ObjectId
+
+  from User @relation("FromUser", fields: [fromId], references: [id], onDelete: Cascade)
+  to   User @relation("ToUser", fields: [toId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([fromId, toId])
 }
 
 // -------- STUDENT PROFILE --------

@@ -53,7 +53,17 @@ export const registerTeacherValidationSchema = z.object({
   }),
 });
 
+const createUserLinkSchema = z.object({
+  targetUserId: z.string().min(1, "Target user ID is required"),
+})
+
+const removeUserLinkSchema = z.object({
+  targetUserId: z.string().min(1),
+});
+
 export const userValidation = {
   createStudentValidationSchema,
   updateProfileSchema,
+  createUserLinkSchema,
+  removeUserLinkSchema
 };
