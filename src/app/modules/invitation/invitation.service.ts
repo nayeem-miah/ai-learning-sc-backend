@@ -42,7 +42,7 @@ const sendInviteService = async (email: string, role: Role = Role.TEACHER) => {
     },
   });
 
-  const inviteLink = `${config.clientUrl}/signup?invite=${token}`;
+  const inviteLink = `${config.clientUrl}/signup?invite=${token}/&role=${role}`;
 
   const html = `
     <div style="font-family:Arial,sans-serif;line-height:1.6">
@@ -99,7 +99,10 @@ const acceptInviteService = async (
   firstName: string,
   lastName: string,
   password: string,
+  subjectsType: string[],
 ) => {
+  console.log(subjectsType);
+
   const invite = await prisma.invite.findUnique({
     where: { token },
   });
@@ -135,9 +138,24 @@ const acceptInviteService = async (
         lastName,
         email: invite.email,
         password: hashedPassword,
-        role: invite.role, // ✅ TEACHER / ADMIN (invite অনুযায়ী)
+        role: invite.role,
+      },
+      include: {
+        teacherProfile: true,
       },
     });
+
+    // ✅ যদি role TEACHER হয় → TeacherProfile create
+    if (invite.role === Role.TEACHER) {
+      await tx.teacherProfile.create({
+        data: {
+          userId: createdUser.id,
+          subjectsType: subjectsType ?? [],
+          expertise: [],
+          bio: null,
+        },
+      });
+    }
 
     await tx.invite.update({
       where: { token },
@@ -152,6 +170,65 @@ const acceptInviteService = async (
 
   return user;
 };
+
+// const acceptInviteService = async (
+//   token: string,
+//   firstName: string,
+//   lastName: string,
+//   password: string,
+// ) => {
+//   const invite = await prisma.invite.findUnique({
+//     where: { token },
+//   });
+
+//   if (!invite) throw new Error("Invalid invite");
+//   if (invite.status !== InvitationStatus.PENDING)
+//     throw new Error("Invite already used or not available");
+
+//   if (invite.expiresAt < new Date()) {
+//     await prisma.invite.update({
+//       where: { token },
+//       data: { status: InvitationStatus.EXPIRED },
+//     });
+//     throw new Error("Invite expired");
+//   }
+
+//   // ensure email not already registered
+//   const existingUser = await prisma.user.findUnique({
+//     where: { email: invite.email },
+//     select: { id: true },
+//   });
+//   if (existingUser) throw new Error("User already registered");
+
+//   const hashedPassword = await bcrypt.hash(
+//     password,
+//     config.salt_rounds as number,
+//   );
+
+//   const user = await prisma.$transaction(async (tx) => {
+//     const createdUser = await tx.user.create({
+//       data: {
+//         firstName,
+//         lastName,
+//         email: invite.email,
+//         password: hashedPassword,
+//         role: invite.role,
+//       },
+//     });
+
+//     await tx.invite.update({
+//       where: { token },
+//       data: {
+//         status: InvitationStatus.ACCEPTED,
+//         acceptedAt: new Date(),
+//       },
+//     });
+
+//     return createdUser;
+//   });
+
+//   return user;
+// };
 
 export const InviteService = {
   sendInviteService,

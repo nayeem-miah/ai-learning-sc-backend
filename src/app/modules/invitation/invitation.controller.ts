@@ -33,16 +33,36 @@ const verifyInvite = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+// const acceptInvite = catchAsync(async (req: Request, res: Response) => {
+//   const { token, firstName, lastName, password } = req.body;
+
+//   const user = await InviteService.acceptInviteService(
+//     token,
+//     firstName,
+//     lastName,
+//     password,
+//   );
+
+//   sendResponse(res, {
+//     statusCode: 201,
+//     success: true,
+//     message: "Invite accepted successfully",
+//     data: user,
+//   });
+// });
+
 const acceptInvite = catchAsync(async (req: Request, res: Response) => {
-  const { token, firstName, lastName, password } = req.body;
+  const { token, firstName, lastName, password, subjectsType } = req.body;
 
   const user = await InviteService.acceptInviteService(
     token,
     firstName,
     lastName,
     password,
+    subjectsType,
   );
 
+  console.log(user);
   sendResponse(res, {
     statusCode: 201,
     success: true,
