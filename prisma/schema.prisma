@@ -47,6 +47,22 @@ enum Status {
   INACTIVE
 }
 
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+}
+
+enum CourseType {
+  SEMESTER
+  FULL_YEAR
+}
+
+enum ClassStatus {
+  ACTIVE
+  ARCHIVED
+}
+
 // -------- USER --------
 
 model User {
@@ -72,8 +88,9 @@ model User {
   courses        Course[]
   studentClasses StudentClass[]
 
-  linksFrom UserLink[] @relation("FromUser")
-  linksTo   UserLink[] @relation("ToUser")
+  linksFrom         UserLink[]         @relation("FromUser")
+  linksTo           UserLink[]         @relation("ToUser")
+  attendanceRecords AttendanceRecord[]
 }
 
 model UserLink {
@@ -117,22 +134,21 @@ model TeacherProfile {
   user User @relation(fields: [userId], references: [id])
 }
 
-enum CourseType {
-  SEMESTER
-  FULL_YEAR
-}
-
 // -------- COURSE --------
 
+// * added nayeem
 model Course {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
   title       String
   subject     String
   description String?
-  level       String
   isPublished Boolean @default(false)
 
+  // Schedule
+  startDate     DateTime?
+  startTime     String?
+  endTime       String?
   // ===== Course Duration =====
   courseType    CourseType // SEMESTER | FULL_YEAR
   semesterCount Int? // only for FULL_YEAR
@@ -154,21 +170,79 @@ model Course {
 
   // ===== Relations =====
   teacherId String @db.ObjectId
-  teacher   User   @relation(fields: [teacherId], references: [id])
+  teacher   User   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
 
-  lessons     Lesson[]
+  modules     Module[]
   enrollments Enrollment[]
 
   // ===== Timestamps =====
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  class     Class?   @relation(fields: [classId], references: [id])
-  classId   String?  @db.ObjectId
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  classId     String?      @db.ObjectId
+  class       Class?       @relation(fields: [classId], references: [id], onDelete: Cascade)
+  attendances Attendance[]
+
+  lessons Lesson[]
 }
 
-enum ClassStatus {
-  ACTIVE
-  ARCHIVED
+// model Course {
+//   id String @id @default(auto()) @map("_id") @db.ObjectId
+
+//   title       String
+//   subject     String
+//   description String?
+//   level       String
+//   isPublished Boolean @default(false)
+
+//   // ===== Course Duration =====
+//   courseType    CourseType // SEMESTER | FULL_YEAR
+//   semesterCount Int? // only for FULL_YEAR
+
+//   quizzesPerModule   Int
+//   totalQuizQuestions Int
+//   hasMidterm         Boolean @default(false)
+//   hasFinal           Boolean @default(false)
+
+//   // ===== Learning Benchmarks =====
+//   masteryRequirement     Int // percentage (e.g. 75)
+//   totalModules           Int
+//   estimatedClassDuration Int // minutes per class
+
+//   // ===== AI / System Flags =====
+//   diagnosticTest   Boolean @default(false)
+//   retestingAllowed Boolean @default(false)
+//   retestingCount   Int?
+
+//   // ===== Relations =====
+//   teacherId String @db.ObjectId
+//   teacher   User   @relation(fields: [teacherId], references: [id])
+
+//   lessons     Lesson[]
+//   enrollments Enrollment[]
+
+//   // ===== Timestamps =====
+//   createdAt   DateTime     @default(now())
+//   updatedAt   DateTime     @updatedAt
+//   class       Class?       @relation(fields: [classId], references: [id])
+//   classId     String?      @db.ObjectId
+//   attendances Attendance[]
+// }
+
+// * added nayeem
+model Module {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  courseId String @db.ObjectId
+  title    String
+  order    Int
+
+  lessons Lesson[]
+
+  quizzes Quiz[]
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
 }
 
 model Class {
@@ -197,44 +271,97 @@ model StudentClass {
   joinedAt DateTime @default(now())
   isActive Boolean  @default(true)
 
-  student User  @relation(fields: [studentId], references: [id])
-  class   Class @relation(fields: [classId], references: [id])
+  student User  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  class   Class @relation(fields: [classId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, classId])
 }
 
 // -------- LESSON --------
 
+// model Lesson {
+//   id          String      @id @default(auto()) @map("_id") @db.ObjectId
+//   courseId    String      @db.ObjectId
+//   title       String
+//   contentType ContentType
+//   videoUrl    String?
+//   textContent String?
+//   order       Int
+//   hasQuiz     Boolean     @default(true)
+
+//   course   Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+//   // quiz     Quiz?
+//   progress LessonProgress[]
+//   module   Module?          @relation(fields: [moduleId], references: [id])
+//   moduleId String?          @db.ObjectId
+// }
+
+// * added nayeem
 model Lesson {
-  id          String      @id @default(auto()) @map("_id") @db.ObjectId
-  courseId    String      @db.ObjectId
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  moduleId String @db.ObjectId
+  courseId String @db.ObjectId
+
   title       String
+  description String?
   contentType ContentType
+
   videoUrl    String?
   textContent String?
-  order       Int
-  hasQuiz     Boolean     @default(true)
 
-  course   Course           @relation(fields: [courseId], references: [id])
-  // quiz     Quiz?
+  duration Int?
+
+  order Int
+
+  hasQuiz Boolean @default(false)
+
+  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
   progress LessonProgress[]
+  quizzes  Quiz[]
 }
 
 // -------- QUIZ --------
 
-model Quiz {
-  id               String  @id @default(auto()) @map("_id") @db.ObjectId
-  // lessonId   String  @unique @db.ObjectId
-  courseName       String?
-  subject          String?
-  targetGradeLevel String?
+// model Quiz {
+//   id               String  @id @default(auto()) @map("_id") @db.ObjectId
+//   // lessonId   String  @unique @db.ObjectId
+//   courseName       String?
+//   subject          String?
+//   targetGradeLevel String?
 
-  title      String
+//   title      String
+//   isAdaptive Boolean @default(false)
+
+//   // lesson    Lesson        @relation(fields: [lessonId], references: [id])
+//   questions Question[]
+//   attempts  QuizAttempt[]
+//   module    Module?       @relation(fields: [moduleId], references: [id])
+//   moduleId  String?       @db.ObjectId
+// }
+
+// * added nayeem
+model Quiz {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  moduleId String  @db.ObjectId
+  lessonId String? @db.ObjectId
+
+  title String
+
+  masteryPercentage Int
+
   isAdaptive Boolean @default(false)
 
-  // lesson    Lesson        @relation(fields: [lessonId], references: [id])
   questions Question[]
-  attempts  QuizAttempt[]
+
+  attempts QuizAttempt[]
+
+  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  lesson Lesson? @relation(fields: [lessonId], references: [id])
 }
 
 model QuizAttempt {
@@ -251,12 +378,11 @@ model QuizAttempt {
   passed      Boolean  @default(false)
   attemptedAt DateTime @default(now())
 
-  student User @relation(fields: [studentId], references: [id])
-  quiz    Quiz @relation(fields: [quizId], references: [id])
+  student User @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  quiz    Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
 
   answers QuizAttemptAnswer[]
 
-  // একবারই দিতে চাইলে uncomment:
   // @@unique([studentId, quizId])
 
   @@index([studentId])
@@ -281,15 +407,36 @@ model QuizAttemptAnswer {
 
 // -------- QUESTION --------
 
+// model Question {
+//   id             String   @id @default(auto()) @map("_id") @db.ObjectId
+//   quizId         String   @db.ObjectId
+//   questionNumber Int
+//   questionText   String
+//   correctAnswer  String
+//   explanation    String?
+//   options        String[]
+//   // difficulty    Difficulty
+
+//   quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+// }
+
+// * added nayeem
 model Question {
-  id             String   @id @default(auto()) @map("_id") @db.ObjectId
-  quizId         String   @db.ObjectId
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  quizId String @db.ObjectId
+
   questionNumber Int
-  questionText   String
-  correctAnswer  String
-  explanation    String?
-  options        String[]
-  // difficulty    Difficulty
+
+  questionText String
+
+  options String[]
+
+  correctAnswer String
+
+  explanation String?
+
+  difficulty Difficulty
 
   quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
 }
@@ -303,8 +450,8 @@ model LessonProgress {
   isCompleted Boolean   @default(false)
   completedAt DateTime?
 
-  student User   @relation(fields: [studentId], references: [id])
-  lesson  Lesson @relation(fields: [lessonId], references: [id])
+  student User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  lesson  Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, lessonId])
 }
@@ -318,8 +465,8 @@ model Enrollment {
   progressPercentage Float   @default(0)
   currentLessonId    String? @db.ObjectId
 
-  student User   @relation(fields: [studentId], references: [id])
-  course  Course @relation(fields: [courseId], references: [id])
+  student User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course  Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, courseId])
 }
@@ -351,7 +498,7 @@ model Notification {
   isRead    Boolean          @default(false)
   createdAt DateTime         @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // -------- TEACHER INVITATION --------
@@ -367,4 +514,33 @@ model Invite {
   acceptedAt DateTime?
 
   @@index([status, expiresAt])
+}
+
+model Attendance {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  courseId  String   @db.ObjectId
+  date      DateTime
+  startTime DateTime
+  endTime   DateTime
+  isActive  Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+
+  course  Course             @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  records AttendanceRecord[]
+
+  @@unique([courseId, date])
+}
+
+model AttendanceRecord {
+  id           String           @id @default(auto()) @map("_id") @db.ObjectId
+  attendanceId String           @db.ObjectId
+  studentId    String           @db.ObjectId
+  joinTime     DateTime?
+  status       AttendanceStatus @default(ABSENT)
+
+  attendance Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  student    User       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([attendanceId, studentId])
 }

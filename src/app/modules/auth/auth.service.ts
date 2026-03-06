@@ -1,15 +1,13 @@
-import bcrypt from "bcrypt";
-import httpStatus from "http-status";
-import { Secret } from "jsonwebtoken";
-import config from "../../config";
-import ApiError from "../../errors/apiError";
-import { prisma } from "../../prisma/prisma";
-import { jwtHelper } from "../../utils/JwtHelper";
-import emailSender from "../../utils/emailSender";
+import bcrypt from 'bcrypt';
+import httpStatus from 'http-status';
+import { Secret } from 'jsonwebtoken';
+import config from '../../config';
+import ApiError from '../../errors/apiError';
+import { prisma } from '../../prisma/prisma';
+import { jwtHelper } from '../../utils/JwtHelper';
+import emailSender from '../../utils/emailSender';
 
 const login = async (payload: { email: string; password: string }) => {
-  console.log(payload);
-
   const user = await prisma.user.findUniqueOrThrow({
     where: {
       email: payload.email,
@@ -17,7 +15,7 @@ const login = async (payload: { email: string; password: string }) => {
   });
 
   if (!user || !user.password) {
-    throw new ApiError(401, "Invalid credentials");
+    throw new ApiError(401, 'Invalid credentials');
   }
 
   const isCorrectPassword = await bcrypt.compare(
@@ -26,7 +24,7 @@ const login = async (payload: { email: string; password: string }) => {
   );
 
   if (!isCorrectPassword) {
-    throw new ApiError(401, "Invalid credentials");
+    throw new ApiError(401, 'Invalid credentials');
   }
 
   const accessToken = jwtHelper.generateToken(
@@ -71,7 +69,7 @@ const forgotPassword = async (payload: { email: string }) => {
   });
 
   if (!userData) {
-    throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
   }
 
   const resetToken = jwtHelper.generateToken(
@@ -87,10 +85,10 @@ const forgotPassword = async (payload: { email: string }) => {
   const resetLink = `${config.reset_pass_link}?token=${resetToken}`;
 
   await emailSender(
-    "Reset Your Password",
+    'Reset Your Password',
     userData.email,
     `
-        <p>Hello ${userData.firstName || "User"},</p>
+        <p>Hello ${userData.firstName || 'User'},</p>
         <p>Click the link below to reset your password:</p>
          <a href="${resetLink}" style="text-decoration: none;">
             <button style="background-color: #007BFF; color: white; padding: 10px 20px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer;">
@@ -101,7 +99,7 @@ const forgotPassword = async (payload: { email: string }) => {
         `,
   );
 
-  return { message: "Reset password email sent" };
+  return { message: 'Reset password email sent' };
 };
 
 const resetPassword = async (token: string, payload: { password: string }) => {
@@ -112,7 +110,7 @@ const resetPassword = async (token: string, payload: { password: string }) => {
   );
 
   if (!decoded) {
-    throw new ApiError(httpStatus.FORBIDDEN, "Invalid or expired token!");
+    throw new ApiError(httpStatus.FORBIDDEN, 'Invalid or expired token!');
   }
 
   const user = await prisma.user.findUnique({
@@ -122,7 +120,7 @@ const resetPassword = async (token: string, payload: { password: string }) => {
   });
 
   if (!user) {
-    throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
   }
 
   // Hash password
@@ -141,7 +139,7 @@ const resetPassword = async (token: string, payload: { password: string }) => {
     },
   });
 
-  return { message: "Password reset successful" };
+  return { message: 'Password reset successful' };
 };
 
 export const AuthServices = {

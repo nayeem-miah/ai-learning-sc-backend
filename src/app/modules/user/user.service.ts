@@ -313,6 +313,16 @@ const getLinkedUsers = async (loggedInUserId: string) => {
       isActive: true,
       createdAt: true,
       updatedAt: true,
+      studentProfile: {
+        select: {
+          id: true,
+          gradeLevel: true,
+          interests: true,
+          learningPreferences: true,
+          goals: true,
+          currentLevel: true,
+        },
+      },
     },
   });
 
@@ -324,41 +334,70 @@ const getLinkedUsers = async (loggedInUserId: string) => {
         { toId: loggedInUserId },
       ],
     },
-    include: {
-      from: true,
-      to: true,
+    select: {
+      fromId: true,
+      toId: true,
+      from: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          profilePicture: true,
+          role: true,
+          status: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+          studentProfile: {
+            select: {
+              id: true,
+              gradeLevel: true,
+              interests: true,
+              learningPreferences: true,
+              goals: true,
+              currentLevel: true,
+            },
+          },
+        },
+      },
+      to: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          profilePicture: true,
+          role: true,
+          status: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+          studentProfile: {
+            select: {
+              id: true,
+              gradeLevel: true,
+              interests: true,
+              learningPreferences: true,
+              goals: true,
+              currentLevel: true,
+            },
+          },
+        },
+      },
     },
   });
 
-
-  const connectedUsers = links.map(link => {
-    if (link.fromId === loggedInUserId) {
-      return link.to;
-    } else {
-      return link.from;
-    }
-  });
-
-
-  const safeConnectedUsers = connectedUsers.map(user => ({
-    id: user.id,
-    firstName: user.firstName,
-    lastName: user.lastName,
-    email: user.email,
-    profilePicture: user.profilePicture,
-    role: user.role,
-    status: user.status,
-    isActive: user.isActive,
-    createdAt: user.createdAt,
-    updatedAt: user.updatedAt,
-  }));
+  // 3️ Extract connected users
+  const linkedUsers = links.map(link =>
+    link.fromId === loggedInUserId ? link.to : link.from
+  );
 
   return {
     loggedInUser,
-    linkedUsers: safeConnectedUsers,
+    linkedUsers,
   };
 };
-
 
 
 export const UserService = {

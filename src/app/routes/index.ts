@@ -5,6 +5,7 @@ import { CourseRoutes } from "../modules/course/course.route";
 import { InviteRoutes } from "../modules/invitation/invitation.route";
 import { UserRoutes } from "../modules/user/user.route";
 import { quizRoutes } from "../modules/quiz/quiz.route";
+import { AttendanceRoutes } from "../modules/attendance/attendance.route";
 
 const router = Router();
 
@@ -21,5 +22,6 @@ router.use("/class", ClassRoutes);
 
 
 router.use("/quiz", quizRoutes);
+router.use('/attendance', AttendanceRoutes)
 
 export default router;

@@ -1,28 +1,39 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Request, Response } from "express";
-import httpStatus from "http-status";
+import { Request, Response } from 'express';
+import httpStatus from 'http-status';
 
-import catchAsync from "../../utils/catchAsync";
-import sendResponse from "../../utils/sendResponse";
-import { CourseService } from "./course.service";
+import catchAsync from '../../utils/catchAsync';
+import sendResponse from '../../utils/sendResponse';
+import { CourseService } from './course.service';
 
 const createCourse = catchAsync(
   async (req: Request & { user?: any }, res: Response) => {
-    const decodedUser = req.user as any;
+    // const decodedUser = req.user as any;
 
     const result = await CourseService.createCourse({
       ...req.body,
-      teacherId: decodedUser.userId,
+      // teacherId: decodedUser.userId,
     });
 
     sendResponse(res, {
       statusCode: httpStatus.CREATED,
       success: true,
-      message: "Course created successfully",
+      message: 'Course created successfully',
       data: result,
     });
   },
 );
+
+const getAllCourses = catchAsync(async (req: Request, res: Response) => {
+  const result = await CourseService.getAllCourses();
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Courses retrieved successfully',
+    data: result,
+  });
+});
 
 const getMyCourses = catchAsync(
   async (req: Request & { user?: any }, res: Response) => {
@@ -33,7 +44,7 @@ const getMyCourses = catchAsync(
     sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,
-      message: "Courses retrieved successfully",
+      message: 'Courses retrieved successfully',
       data: result,
     });
   },
@@ -49,7 +60,7 @@ const getSingleCourse = catchAsync(
     sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,
-      message: "Course retrieved successfully",
+      message: 'Course retrieved successfully',
       data: result,
     });
   },
@@ -69,7 +80,7 @@ const updateCourse = catchAsync(
     sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,
-      message: "Course updated successfully",
+      message: 'Course updated successfully',
       data: result,
     });
   },
@@ -85,7 +96,7 @@ const deleteCourse = catchAsync(
     sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,
-      message: "Course deleted successfully",
+      message: 'Course deleted successfully',
     });
   },
 );
@@ -96,4 +107,5 @@ export const CourseController = {
   getSingleCourse,
   updateCourse,
   deleteCourse,
+  getAllCourses,
 };

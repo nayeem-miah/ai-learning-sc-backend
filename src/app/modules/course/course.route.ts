@@ -1,24 +1,33 @@
-import { Role } from "@prisma/client";
-import { Router } from "express";
-import auth from "../../middlewares/auth";
-import { CourseController } from "./course.controller";
+import { Role } from '@prisma/client';
+import { Router } from 'express';
+import auth from '../../middlewares/auth';
+import { CourseController } from './course.controller';
 
 const router = Router();
 
-router.post("/", auth(Role.STUDENT, Role.ADMIN), CourseController.createCourse);
-router.get("/", auth(Role.ADMIN, Role.STUDENT), CourseController.getMyCourses);
+router.post('/', auth(Role.STUDENT, Role.ADMIN), CourseController.createCourse);
 router.get(
-  "/:id",
+  '/',
+  auth(Role.ADMIN, Role.STUDENT, Role.TEACHER),
+  CourseController.getAllCourses,
+);
+router.get(
+  '/myCourses',
+  auth(Role.ADMIN, Role.STUDENT, Role.TEACHER),
+  CourseController.getMyCourses,
+);
+router.get(
+  '/:id',
   auth(Role.ADMIN, Role.STUDENT),
   CourseController.getSingleCourse,
 );
 router.patch(
-  "/:id",
+  '/:id',
   auth(Role.ADMIN, Role.STUDENT),
   CourseController.updateCourse,
 );
 router.delete(
-  "/:id",
+  '/:id',
   auth(Role.ADMIN, Role.STUDENT),
   CourseController.deleteCourse,
 );
