@@ -1,0 +1,192 @@
+import { Request, Response } from 'express';
+import httpStatus from 'http-status';
+import catchAsync from '../../utils/catchAsync';
+import sendResponse from '../../utils/sendResponse';
+import { CourseSetupService } from './courseSetup.service';
+
+// Create a new course
+const courseSetup = catchAsync(async (req: Request, res: Response) => {
+  const {
+    course_name,
+    subject,
+    target_grade_level,
+    course_length,
+    semester_count,
+    diagnostic_test_before_course,
+    retesting_allowed,
+    retesting_count,
+    quizzes_per_module,
+    midterm_examination,
+    final_examination,
+    total_quiz_questions,
+    mastery_requirement,
+    total_modules,
+    estimated_duration_min_per_class,
+  } = req.body;
+
+  // Validate required fields
+  const requiredFields = [
+    'course_name',
+    'subject',
+    'target_grade_level',
+    'course_length',
+    'semester_count',
+    'total_modules',
+    'total_quiz_questions',
+    'mastery_requirement',
+    'estimated_duration_min_per_class',
+  ];
+
+  const missing = requiredFields.filter(
+    (f) =>
+      req.body[f] === undefined || req.body[f] === null || req.body[f] === '',
+  );
+  if (missing.length > 0) {
+    res.status(httpStatus.BAD_REQUEST).json({
+      success: false,
+      message: `Missing required fields: ${missing.join(', ')}`,
+    });
+    return;
+  }
+
+  const result = await CourseSetupService.courseSetup({
+    course_name,
+    subject,
+    target_grade_level,
+    course_length,
+    semester_count: Number(semester_count),
+    diagnostic_test_before_course: Boolean(
+      diagnostic_test_before_course ?? false,
+    ),
+    retesting_allowed: Boolean(retesting_allowed ?? false),
+    retesting_count: Number(retesting_count ?? 0),
+    quizzes_per_module: Number(quizzes_per_module ?? 0),
+    midterm_examination: Boolean(midterm_examination ?? false),
+    final_examination: Boolean(final_examination ?? false),
+    total_quiz_questions: Number(total_quiz_questions),
+    mastery_requirement: Number(mastery_requirement),
+    total_modules: Number(total_modules),
+    estimated_duration_min_per_class: Number(estimated_duration_min_per_class),
+  });
+
+  sendResponse(res, {
+    statusCode: httpStatus.CREATED,
+    success: true,
+    message: 'Course setup completed successfully',
+    data: result,
+  });
+});
+
+// Generate Quiz
+const generateQuiz = catchAsync(async (req: Request, res: Response) => {
+  const { unique_user_id, unique_session_id } = req.body;
+
+  if (!unique_user_id || !unique_session_id) {
+    res.status(httpStatus.BAD_REQUEST).json({
+      success: false,
+      message: 'Both unique_user_id and unique_session_id are required',
+    });
+    return;
+  }
+
+  const result = await CourseSetupService.generateQuiz({
+    unique_user_id,
+    unique_session_id,
+  });
+
+  sendResponse(res, {
+    statusCode: httpStatus.CREATED,
+    success: true,
+    message: 'Quiz questions generated successfully',
+    data: result,
+  });
+});
+
+const submitQuizAnswer = catchAsync(async (req: Request, res: Response) => {
+  const { unique_user_id, unique_session_id, question_id, selected_answer } =
+    req.body;
+
+  if (
+    !unique_user_id ||
+    !unique_session_id ||
+    !question_id ||
+    !selected_answer
+  ) {
+    res.status(httpStatus.BAD_REQUEST).json({
+      success: false,
+      message:
+        'All fields are required: unique_user_id, unique_session_id, question_id, selected_answer',
+    });
+    return;
+  }
+
+  const result = await CourseSetupService.submitQuizAnswer({
+    unique_user_id,
+    unique_session_id,
+    question_id,
+    selected_answer,
+  });
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Answer submitted successfully',
+    data: result,
+  });
+});
+
+const getQuizResults = catchAsync(async (req: Request, res: Response) => {
+  const { unique_session_id, unique_user_id } = req.query as {
+    unique_session_id?: string;
+    unique_user_id?: string;
+  };
+
+  if (!unique_session_id || !unique_user_id) {
+    res.status(httpStatus.BAD_REQUEST).json({
+      success: false,
+      message: 'Query params required: unique_session_id, unique_user_id',
+    });
+    return;
+  }
+
+  const result = await CourseSetupService.getQuizResults({
+    unique_session_id,
+    unique_user_id,
+  });
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Quiz results fetched successfully',
+    data: result,
+  });
+});
+
+const getAllCourses = catchAsync(async (req: Request, res: Response) => {
+  const result = await CourseSetupService.getAllCourses();
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'All courses fetched successfully',
+    data: result,
+  });
+});
+const getCourseBySession = catchAsync(async (req: Request, res: Response) => {
+  const { session_id } = req.params;
+  const result = await CourseSetupService.getCourseBySession(session_id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Course fetched successfully',
+    data: result,
+  });
+});
+
+export const CourseSetupController = {
+  courseSetup,
+  generateQuiz,
+  submitQuizAnswer,
+  getQuizResults,
+  getAllCourses,
+  getCourseBySession,
+};

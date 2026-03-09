@@ -1,7 +1,3 @@
-// ===============================
-// Prisma Schema (AI Learning App)
-// ===============================
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -107,8 +103,6 @@ model UserLink {
   @@unique([fromId, toId])
 }
 
-// -------- STUDENT PROFILE --------
-
 model StudentProfile {
   id         String @id @default(auto()) @map("_id") @db.ObjectId
   userId     String @unique @db.ObjectId
@@ -185,49 +179,6 @@ model Course {
   lessons Lesson[]
 }
 
-// model Course {
-//   id String @id @default(auto()) @map("_id") @db.ObjectId
-
-//   title       String
-//   subject     String
-//   description String?
-//   level       String
-//   isPublished Boolean @default(false)
-
-//   // ===== Course Duration =====
-//   courseType    CourseType // SEMESTER | FULL_YEAR
-//   semesterCount Int? // only for FULL_YEAR
-
-//   quizzesPerModule   Int
-//   totalQuizQuestions Int
-//   hasMidterm         Boolean @default(false)
-//   hasFinal           Boolean @default(false)
-
-//   // ===== Learning Benchmarks =====
-//   masteryRequirement     Int // percentage (e.g. 75)
-//   totalModules           Int
-//   estimatedClassDuration Int // minutes per class
-
-//   // ===== AI / System Flags =====
-//   diagnosticTest   Boolean @default(false)
-//   retestingAllowed Boolean @default(false)
-//   retestingCount   Int?
-
-//   // ===== Relations =====
-//   teacherId String @db.ObjectId
-//   teacher   User   @relation(fields: [teacherId], references: [id])
-
-//   lessons     Lesson[]
-//   enrollments Enrollment[]
-
-//   // ===== Timestamps =====
-//   createdAt   DateTime     @default(now())
-//   updatedAt   DateTime     @updatedAt
-//   class       Class?       @relation(fields: [classId], references: [id])
-//   classId     String?      @db.ObjectId
-//   attendances Attendance[]
-// }
-
 // * added nayeem
 model Module {
   id String @id @default(auto()) @map("_id") @db.ObjectId
@@ -277,25 +228,6 @@ model StudentClass {
   @@unique([studentId, classId])
 }
 
-// -------- LESSON --------
-
-// model Lesson {
-//   id          String      @id @default(auto()) @map("_id") @db.ObjectId
-//   courseId    String      @db.ObjectId
-//   title       String
-//   contentType ContentType
-//   videoUrl    String?
-//   textContent String?
-//   order       Int
-//   hasQuiz     Boolean     @default(true)
-
-//   course   Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
-//   // quiz     Quiz?
-//   progress LessonProgress[]
-//   module   Module?          @relation(fields: [moduleId], references: [id])
-//   moduleId String?          @db.ObjectId
-// }
-
 // * added nayeem
 model Lesson {
   id String @id @default(auto()) @map("_id") @db.ObjectId
@@ -322,25 +254,6 @@ model Lesson {
   progress LessonProgress[]
   quizzes  Quiz[]
 }
-
-// -------- QUIZ --------
-
-// model Quiz {
-//   id               String  @id @default(auto()) @map("_id") @db.ObjectId
-//   // lessonId   String  @unique @db.ObjectId
-//   courseName       String?
-//   subject          String?
-//   targetGradeLevel String?
-
-//   title      String
-//   isAdaptive Boolean @default(false)
-
-//   // lesson    Lesson        @relation(fields: [lessonId], references: [id])
-//   questions Question[]
-//   attempts  QuizAttempt[]
-//   module    Module?       @relation(fields: [moduleId], references: [id])
-//   moduleId  String?       @db.ObjectId
-// }
 
 // * added nayeem
 model Quiz {
@@ -405,21 +318,6 @@ model QuizAttemptAnswer {
   @@index([questionId])
 }
 
-// -------- QUESTION --------
-
-// model Question {
-//   id             String   @id @default(auto()) @map("_id") @db.ObjectId
-//   quizId         String   @db.ObjectId
-//   questionNumber Int
-//   questionText   String
-//   correctAnswer  String
-//   explanation    String?
-//   options        String[]
-//   // difficulty    Difficulty
-
-//   quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
-// }
-
 // * added nayeem
 model Question {
   id String @id @default(auto()) @map("_id") @db.ObjectId
@@ -455,8 +353,6 @@ model LessonProgress {
 
   @@unique([studentId, lessonId])
 }
-
-//
 
 model Enrollment {
   id                 String  @id @default(auto()) @map("_id") @db.ObjectId
@@ -543,4 +439,118 @@ model AttendanceRecord {
   student    User       @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([attendanceId, studentId])
+}
+
+//   by ai
+model UserId {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  courses     CourseNameGenerator[]
+  quizAnswers QuizAnswer[]
+}
+
+model CourseNameGenerator {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  uniqueSessionId String @unique
+  uniqueUserId    String
+
+  // Course identity
+  courseName          String
+  generatedCourseName String?
+  subject             String
+  targetGradeLevel    String
+  courseLength        String
+  courseType          String?
+
+  // Course config (mirrors AI CourseInput)
+  semesterCount                Int     @default(1)
+  diagnosticTestBeforeCourse   Boolean @default(false)
+  retestingAllowed             Boolean @default(false)
+  retestingCount               Int     @default(0)
+  quizzesPerModule             Int     @default(0)
+  midtermExamination           Boolean @default(false)
+  finalExamination             Boolean @default(false)
+  totalQuizQuestions           Int     @default(0)
+  masteryRequirement           Float   @default(0)
+  totalModules                 Int
+  estimatedDurationMinPerClass Int     @default(0)
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  user    UserId                   @relation(fields: [uniqueUserId], references: [userId])
+  modules CourseLectureGenerator[]
+  quizzes QuizQuestion[]
+}
+
+// -------- COURSE LECTURE GENERATOR --------
+// Stores each AI-generated module/lecture content
+model CourseLectureGenerator {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  uniqueSessionId String // FK → CourseNameGenerator.uniqueSessionId
+  moduleNumber    Int
+  moduleTitle     String
+  introduction    String?
+  studyTopics     Json? // array of topic objects from AI
+  voiceData       Json? // TTS voice metadata
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  course        CourseNameGenerator @relation(fields: [uniqueSessionId], references: [uniqueSessionId])
+  quizQuestions QuizQuestion[]
+
+  // Prevent duplicate module numbers per session
+  @@unique([uniqueSessionId, moduleNumber])
+}
+
+// -------- QUIZ QUESTION --------
+// Stores AI-generated quiz questions per session
+model QuizQuestion {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  questionId      String  @unique // e.g. QID-xxxx
+  uniqueSessionId String // FK → CourseNameGenerator.uniqueSessionId
+  moduleId        String?
+
+  questionNumber Int
+  questionText   String
+
+  optionA       String
+  optionB       String
+  optionC       String
+  optionD       String
+  correctAnswer String // "A" | "B" | "C" | "D"
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  course  CourseNameGenerator     @relation(fields: [uniqueSessionId], references: [uniqueSessionId])
+  module  CourseLectureGenerator? @relation(fields: [moduleId], references: [id])
+  answers QuizAnswer[]
+}
+
+// -------- QUIZ ANSWER --------
+// Stores user-submitted answers
+model QuizAnswer {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  uniqueUserId    String // FK → UserId.userId
+  uniqueSessionId String // which session
+  questionId      String // FK → QuizQuestion.questionId
+  selectedAnswer  String // "A" | "B" | "C" | "D"
+  correctAnswer   String
+  isCorrect       Boolean
+
+  submittedAt DateTime @default(now())
+
+  // Relations
+  user     UserId       @relation(fields: [uniqueUserId], references: [userId])
+  question QuizQuestion @relation(fields: [questionId], references: [questionId])
 }

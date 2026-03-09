@@ -1,27 +1,30 @@
-import { Router } from "express";
-import { AuthRoutes } from "../modules/auth/auth.route";
-import { ClassRoutes } from "../modules/class/class.route";
-import { CourseRoutes } from "../modules/course/course.route";
-import { InviteRoutes } from "../modules/invitation/invitation.route";
-import { UserRoutes } from "../modules/user/user.route";
-import { quizRoutes } from "../modules/quiz/quiz.route";
-import { AttendanceRoutes } from "../modules/attendance/attendance.route";
+import { Router } from 'express';
+import { AttendanceRoutes } from '../modules/attendance/attendance.route';
+import { AuthRoutes } from '../modules/auth/auth.route';
+import { ClassRoutes } from '../modules/class/class.route';
+import { AIQuizRoutes } from '../modules/course-setup/aiQuiz.route';
+import { CourseSetupRoutes } from '../modules/course-setup/courseSetup.route';
+import { InviteRoutes } from '../modules/invitation/invitation.route';
+import { UserRoutes } from '../modules/user/user.route';
 
 const router = Router();
 
 // user routes
-router.use("/users", UserRoutes);
+router.use('/users', UserRoutes);
 // auth routes;
-router.use("/auth", AuthRoutes);
+router.use('/auth', AuthRoutes);
 // invitation routes
-router.use("/invite", InviteRoutes);
+router.use('/invite', InviteRoutes);
 
-router.use("/course", CourseRoutes);
+// router.use('/course', CourseRoutes);
 
-router.use("/class", ClassRoutes);
+router.use('/class', ClassRoutes);
 
+// router.use('/quiz', quizRoutes);
+router.use('/attendance', AttendanceRoutes);
 
-router.use("/quiz", quizRoutes);
-router.use('/attendance', AttendanceRoutes)
+// ── AI Course Setup & Quiz System
+router.use('/course', CourseSetupRoutes);
+router.use('/quiz', AIQuizRoutes);
 
 export default router;
