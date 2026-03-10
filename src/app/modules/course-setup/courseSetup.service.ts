@@ -142,8 +142,9 @@ const submitAnswerToAI = async (payload: {
   correct_answer: string;
   message: string;
 }> => {
+  console.log('----------------------- calling ai apis', payload);
   const response = await aiClient.post('/api/v1/quiz/submit-answer', payload);
-
+  console.log(response.data);
   const result = response.data;
   return {
     success: result.success ?? true,
@@ -448,6 +449,7 @@ const courseSetup = async (body: TCourseSetupPayload) => {
                 },
                 create: {
                   questionId: uniqueQuestionKey,
+                  originalQuestionId: q.question_id,
                   uniqueSessionId,
                   moduleId: savedModule!.id,
                   questionNumber: q.question_number,
@@ -551,7 +553,20 @@ const submitQuizAnswer = async (body: {
   selected_answer: string;
 }) => {
   try {
-    const result = await submitAnswerToAI(body);
+    // 1. Find the question in our DB to get its original AI questionId
+    const question = await prisma.quizQuestion.findUnique({
+      where: { questionId: body.question_id },
+    });
+
+    if (!question) {
+      throw new ApiError(404, `Question not found in database: ${body.question_id}`);
+    }
+
+    // 2. Submit the ORIGINAL ID to AI
+    const result = await submitAnswerToAI({
+      ...body,
+      question_id: question.originalQuestionId || question.questionId,
+    });
 
     //  DB SAVE: QuizAnswer collection
     await prisma.quizAnswer.create({

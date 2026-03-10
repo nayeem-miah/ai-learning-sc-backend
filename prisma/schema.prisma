@@ -542,8 +542,9 @@ model CourseLectureGenerator {
 model QuizQuestion {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  questionId      String  @unique // e.g. QID-xxxx
-  uniqueSessionId String // FK → CourseNameGenerator.uniqueSessionId
+  questionId         String  @unique // our unique key
+  originalQuestionId String? // the AI's original question_id
+  uniqueSessionId    String // FK → CourseNameGenerator.uniqueSessionId
   moduleId        String?
 
   questionNumber Int
