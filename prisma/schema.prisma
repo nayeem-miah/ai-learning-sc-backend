@@ -252,16 +252,12 @@ model Lesson {
 
 // * added nayeem
 model Quiz {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
-
-  moduleId String  @db.ObjectId
-  lessonId String? @db.ObjectId
-
-  title String
-
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  moduleId          String  @db.ObjectId
+  lessonId          String? @db.ObjectId
+  title             String
   masteryPercentage Int
-
-  isAdaptive Boolean @default(false)
+  isAdaptive        Boolean @default(false)
 
   questions Question[]
 
