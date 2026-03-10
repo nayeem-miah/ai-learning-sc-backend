@@ -110,16 +110,14 @@ model UserLink {
 // -------- STUDENT PROFILE --------
 
 model StudentProfile {
-  id         String @id @default(auto()) @map("_id") @db.ObjectId
-  userId     String @unique @db.ObjectId
-  gradeLevel String
-
+  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId              String   @unique @db.ObjectId
+  gradeLevel          String
   interests           String[]
   learningPreferences String[]
   goals               String?
   currentLevel        String?
-
-  user User @relation(fields: [userId], references: [id])
+  user                User     @relation(fields: [userId], references: [id])
 }
 
 // -------- TEACHER PROFILE --------
@@ -130,8 +128,7 @@ model TeacherProfile {
   expertise    String[]
   bio          String?
   subjectsType String[]
-
-  user User @relation(fields: [userId], references: [id])
+  user         User     @relation(fields: [userId], references: [id])
 }
 
 // -------- COURSE --------
@@ -237,10 +234,8 @@ model Module {
   order    Int
 
   lessons Lesson[]
-
   quizzes Quiz[]
-
-  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 }
@@ -424,19 +419,13 @@ model QuizAttemptAnswer {
 model Question {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  quizId String @db.ObjectId
-
+  quizId         String     @db.ObjectId
   questionNumber Int
-
-  questionText String
-
-  options String[]
-
-  correctAnswer String
-
-  explanation String?
-
-  difficulty Difficulty
+  questionText   String
+  options        String[]
+  correctAnswer  String
+  explanation    String?
+  difficulty     Difficulty
 
   quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
 }
