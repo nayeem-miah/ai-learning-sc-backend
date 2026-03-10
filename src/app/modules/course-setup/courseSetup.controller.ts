@@ -79,12 +79,12 @@ const courseSetup = catchAsync(async (req: Request, res: Response) => {
 
 // Generate Quiz
 const generateQuiz = catchAsync(async (req: Request, res: Response) => {
-  const { unique_user_id, unique_session_id } = req.body;
+  const { unique_user_id, unique_session_id, module_number } = req.body;
 
-  if (!unique_user_id || !unique_session_id) {
+  if (!unique_user_id || !unique_session_id || !module_number) {
     res.status(httpStatus.BAD_REQUEST).json({
       success: false,
-      message: 'Both unique_user_id and unique_session_id are required',
+      message: 'unique_user_id, unique_session_id, and module_number are required',
     });
     return;
   }
@@ -92,6 +92,7 @@ const generateQuiz = catchAsync(async (req: Request, res: Response) => {
   const result = await CourseSetupService.generateQuiz({
     unique_user_id,
     unique_session_id,
+    module_number: Number(module_number),
   });
 
   sendResponse(res, {
@@ -171,6 +172,7 @@ const getAllCourses = catchAsync(async (req: Request, res: Response) => {
     data: result,
   });
 });
+
 const getCourseBySession = catchAsync(async (req: Request, res: Response) => {
   const { session_id } = req.params;
   const result = await CourseSetupService.getCourseBySession(session_id);
@@ -182,6 +184,93 @@ const getCourseBySession = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+// Submit all answers for a single module at once (bulk)
+const submitModuleQuiz = catchAsync(async (req: Request, res: Response) => {
+  const { unique_user_id, unique_session_id, module_id, answers } = req.body;
+
+  if (
+    !unique_user_id ||
+    !unique_session_id ||
+    !module_id ||
+    !Array.isArray(answers) ||
+    answers.length === 0
+  ) {
+    res.status(httpStatus.BAD_REQUEST).json({
+      success: false,
+      message:
+        'Required: unique_user_id, unique_session_id, module_id, answers (non-empty array of { question_id, selected_answer })',
+    });
+    return;
+  }
+
+  const result = await CourseSetupService.submitModuleQuiz({
+    unique_user_id,
+    unique_session_id,
+    module_id,
+    answers,
+  });
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Module quiz submitted successfully',
+    data: result,
+  });
+});
+
+// Get quiz result for a specific user & module (user sees their own result)
+const getModuleQuizResult = catchAsync(async (req: Request, res: Response) => {
+  const { unique_user_id, unique_session_id, module_id } = req.query as {
+    unique_user_id?: string;
+    unique_session_id?: string;
+    module_id?: string;
+  };
+
+  if (!unique_user_id || !unique_session_id || !module_id) {
+    res.status(httpStatus.BAD_REQUEST).json({
+      success: false,
+      message:
+        'Query params required: unique_user_id, unique_session_id, module_id',
+    });
+    return;
+  }
+
+  const result = await CourseSetupService.getModuleQuizResult({
+    unique_user_id,
+    unique_session_id,
+    module_id,
+  });
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Module quiz result fetched successfully',
+    data: result,
+  });
+});
+
+// Get all users' quiz results for a session/module (public — anyone can see)
+const getModuleQuizResultPublic = catchAsync(
+  async (req: Request, res: Response) => {
+    const { unique_session_id, module_id } = req.query as {
+      unique_session_id?: string;
+      module_id?: string;
+    };
+
+    const result = await CourseSetupService.getModuleQuizResultPublic({
+      unique_session_id,
+      module_id,
+    });
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: 'All module quiz results fetched successfully',
+      data: result,
+    });
+  },
+);
+
 export const CourseSetupController = {
   courseSetup,
   generateQuiz,
@@ -189,4 +278,7 @@ export const CourseSetupController = {
   getQuizResults,
   getAllCourses,
   getCourseBySession,
+  submitModuleQuiz,
+  getModuleQuizResult,
+  getModuleQuizResultPublic,
 };

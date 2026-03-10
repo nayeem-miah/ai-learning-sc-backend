@@ -14,6 +14,14 @@ export interface TCourseSetupPayload {
   mastery_requirement: number;
   total_modules: number;
   estimated_duration_min_per_class: number;
+
+  // Optional fields mirroring Course model
+  description?: string;
+  is_published?: boolean;
+  start_date?: string; // ISO date string
+  start_time?: string;
+  end_time?: string;
+  class_id?: string; // Class MongoDB ObjectId
 }
 
 export interface TCourseFromAi {
@@ -34,3 +42,4 @@ export interface TCourseFromAi {
   total_modules: number;
   estimated_duration_min_per_class: number;
 }
+
