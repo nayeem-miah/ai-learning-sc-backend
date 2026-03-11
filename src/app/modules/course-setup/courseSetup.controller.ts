@@ -337,6 +337,32 @@ const deleteCourse = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getStudentPublishedCourses = catchAsync(
+  async (req: Request & { user?: any }, res: Response) => {
+    const studentId = req.user.userId;
+    const result = await CourseSetupService.getStudentPublishedCourses(studentId);
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: 'Student published courses fetched successfully',
+      data: result,
+    });
+  },
+);
+
+const getTeacherPublishedCourses = catchAsync(
+  async (req: Request & { user?: any }, res: Response) => {
+    const teacherId = req.user.userId;
+    const result = await CourseSetupService.getTeacherPublishedCourses(teacherId);
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: 'Teacher published courses fetched successfully',
+      data: result,
+    });
+  },
+);
+
 export const CourseSetupController = {
   courseSetup,
   generateQuiz,
@@ -353,4 +379,6 @@ export const CourseSetupController = {
   getModuleQuizResult,
   getModuleQuizResultPublic,
   deleteCourse,
+  getStudentPublishedCourses,
+  getTeacherPublishedCourses,
 };
