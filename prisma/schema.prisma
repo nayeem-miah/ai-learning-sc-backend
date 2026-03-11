@@ -79,9 +79,7 @@ model User {
 
   enrollments    Enrollment[]
   lessonProgress LessonProgress[]
-  quizAttempts   QuizAttempt[]
   notifications  Notification[]
-  courses        Course[]
   studentClasses StudentClass[]
 
   linksFrom            UserLink[]            @relation("FromUser")
@@ -129,74 +127,6 @@ model TeacherProfile {
   user User @relation(fields: [userId], references: [id])
 }
 
-// -------- COURSE --------
-
-// * added nayeem
-model Course {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
-
-  title       String
-  subject     String
-  description String?
-  isPublished Boolean @default(false)
-
-  // Schedule
-  startDate     DateTime?
-  startTime     String?
-  endTime       String?
-  // ===== Course Duration =====
-  courseType    CourseType // SEMESTER | FULL_YEAR
-  semesterCount Int? // only for FULL_YEAR
-
-  quizzesPerModule   Int
-  totalQuizQuestions Int
-  hasMidterm         Boolean @default(false)
-  hasFinal           Boolean @default(false)
-
-  // ===== Learning Benchmarks =====
-  masteryRequirement     Int // percentage (e.g. 75)
-  totalModules           Int
-  estimatedClassDuration Int // minutes per class
-
-  // ===== AI / System Flags =====
-  diagnosticTest   Boolean @default(false)
-  retestingAllowed Boolean @default(false)
-  retestingCount   Int?
-
-  // ===== Relations =====
-  teacherId String @db.ObjectId
-  teacher   User   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-
-  modules     Module[]
-  enrollments Enrollment[]
-
-  // ===== Timestamps =====
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  classId     String?      @db.ObjectId
-  class       Class?       @relation(fields: [classId], references: [id], onDelete: Cascade)
-  attendances Attendance[]
-
-  lessons Lesson[]
-}
-
-// * added nayeem
-model Module {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
-
-  courseId String @db.ObjectId
-  title    String
-  order    Int
-
-  lessons Lesson[]
-
-  quizzes Quiz[]
-
-  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-}
-
 model Class {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
@@ -205,7 +135,6 @@ model Class {
 
   // Relations
   students      StudentClass[]
-  courses       Course[]
   totalStudents Int            @default(0)
 
   // AI-generated courses linked to this class
@@ -232,117 +161,6 @@ model StudentClass {
   @@unique([studentId, classId])
 }
 
-// * added nayeem
-model Lesson {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
-
-  moduleId String @db.ObjectId
-  courseId String @db.ObjectId
-
-  title       String
-  description String?
-  contentType ContentType
-
-  videoUrl    String?
-  textContent String?
-
-  duration Int?
-
-  order Int
-
-  hasQuiz Boolean @default(false)
-
-  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
-
-  progress LessonProgress[]
-  quizzes  Quiz[]
-}
-
-// * added nayeem
-model Quiz {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
-
-  moduleId String  @db.ObjectId
-  lessonId String? @db.ObjectId
-
-  title String
-
-  masteryPercentage Int
-
-  isAdaptive Boolean @default(false)
-
-  questions Question[]
-
-  attempts QuizAttempt[]
-
-  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-
-  lesson Lesson? @relation(fields: [lessonId], references: [id])
-}
-
-model QuizAttempt {
-  id        String @id @default(auto()) @map("_id") @db.ObjectId
-  studentId String @db.ObjectId
-  quizId    String @db.ObjectId
-
-  total    Int
-  correct  Int
-  wrong    Int
-  accuracy Int
-  points   Int?
-
-  passed      Boolean  @default(false)
-  attemptedAt DateTime @default(now())
-
-  student User @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  quiz    Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
-
-  answers QuizAttemptAnswer[]
-
-  // @@unique([studentId, quizId])
-
-  @@index([studentId])
-  @@index([quizId])
-}
-
-model QuizAttemptAnswer {
-  id         String @id @default(auto()) @map("_id") @db.ObjectId
-  attemptId  String @db.ObjectId
-  questionId String @db.ObjectId
-
-  selectedOption String?
-  correctOption  String
-  isCorrect      Boolean
-  explanation    String?
-
-  attempt QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-
-  @@index([attemptId])
-  @@index([questionId])
-}
-
-// * added nayeem
-model Question {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
-
-  quizId String @db.ObjectId
-
-  questionNumber Int
-
-  questionText String
-
-  options String[]
-
-  correctAnswer String
-
-  explanation String?
-
-  difficulty Difficulty
-
-  quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
-}
-
 // -------- LESSON PROGRESS (NO SKIP) --------
 
 model LessonProgress {
@@ -352,8 +170,8 @@ model LessonProgress {
   isCompleted Boolean   @default(false)
   completedAt DateTime?
 
-  student User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  lesson  Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  student  User                   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  aiLesson CourseLectureGenerator @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, lessonId])
 }
@@ -367,7 +185,6 @@ model Enrollment {
   currentLessonId    String? @db.ObjectId
 
   student  User                 @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  course   Course?              @relation(fields: [courseId], references: [id], onDelete: Cascade)
   aiCourse CourseNameGenerator? @relation(fields: [aiCourseId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, courseId])
@@ -430,7 +247,6 @@ model Attendance {
 
   createdAt DateTime @default(now())
 
-  course   Course?              @relation(fields: [courseId], references: [id], onDelete: Cascade)
   aiCourse CourseNameGenerator? @relation(fields: [aiCourseId], references: [id], onDelete: Cascade)
   records  AttendanceRecord[]
 
@@ -505,6 +321,9 @@ model CourseNameGenerator {
   teacherId String? @db.ObjectId
   teacher   User?   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
 
+  hasMidterm Boolean @default(false)
+  hasFinal   Boolean @default(false)
+
   // Linked Class (optional — course may or may not be assigned to a class)
   classId String? @db.ObjectId
   class   Class?  @relation(fields: [classId], references: [id], onDelete: Cascade)
@@ -530,8 +349,9 @@ model CourseLectureGenerator {
   updatedAt DateTime @updatedAt
 
   // Relations
-  course        CourseNameGenerator @relation(fields: [uniqueSessionId], references: [uniqueSessionId], onDelete: Cascade)
-  quizQuestions QuizQuestion[]
+  course           CourseNameGenerator @relation(fields: [uniqueSessionId], references: [uniqueSessionId], onDelete: Cascade)
+  quizQuestions    QuizQuestion[]
+  lessonProgresses LessonProgress[]
 
   // Prevent duplicate module numbers per session
   @@unique([uniqueSessionId, moduleNumber])
@@ -545,7 +365,7 @@ model QuizQuestion {
   questionId         String  @unique // our unique key
   originalQuestionId String? // the AI's original question_id
   uniqueSessionId    String // FK → CourseNameGenerator.uniqueSessionId
-  moduleId        String?
+  moduleId           String?
 
   questionNumber Int
   questionText   String
@@ -565,7 +385,7 @@ model QuizQuestion {
 }
 
 // -------- QUIZ ANSWER --------
-// Stores user-submitted answers
+
 model QuizAnswer {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 

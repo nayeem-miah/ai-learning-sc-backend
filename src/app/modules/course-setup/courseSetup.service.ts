@@ -1097,6 +1097,50 @@ const deleteCourse = async (id: string) => {
   });
 };
 
+const getStudentPublishedCourses = async (studentId: string) => {
+  return await prisma.courseNameGenerator.findMany({
+    where: {
+      isPublished: true,
+      enrollments: {
+        some: {
+          studentId,
+        },
+      },
+    },
+    include: {
+      modules: {
+        orderBy: { moduleNumber: 'asc' },
+        include: {
+          quizQuestions: {
+            orderBy: { questionNumber: 'asc' },
+          },
+        },
+      },
+      class: true,
+    },
+  });
+};
+
+const getTeacherPublishedCourses = async (teacherId: string) => {
+  return await prisma.courseNameGenerator.findMany({
+    where: {
+      isPublished: true,
+      teacherId,
+    },
+    include: {
+      modules: {
+        orderBy: { moduleNumber: 'asc' },
+        include: {
+          quizQuestions: {
+            orderBy: { questionNumber: 'asc' },
+          },
+        },
+      },
+      class: true,
+    },
+  });
+};
+
 export const CourseSetupService = {
   courseSetup,
   generateQuiz,
@@ -1113,4 +1157,6 @@ export const CourseSetupService = {
   getModuleQuizResult,
   getModuleQuizResultPublic,
   deleteCourse,
+  getStudentPublishedCourses,
+  getTeacherPublishedCourses,
 };
