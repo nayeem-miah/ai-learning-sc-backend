@@ -4,6 +4,7 @@ import auth from '../../middlewares/auth';
 import { CourseSetupController } from './courseSetup.controller';
 
 const router = Router();
+// const router = express.Router();
 
 router.post('/setup', auth(Role.ADMIN), CourseSetupController.courseSetup);
 
