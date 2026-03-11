@@ -103,16 +103,14 @@ model UserLink {
 }
 
 model StudentProfile {
-  id         String @id @default(auto()) @map("_id") @db.ObjectId
-  userId     String @unique @db.ObjectId
-  gradeLevel String
-
+  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId              String   @unique @db.ObjectId
+  gradeLevel          String
   interests           String[]
   learningPreferences String[]
   goals               String?
   currentLevel        String?
-
-  user User @relation(fields: [userId], references: [id])
+  user                User     @relation(fields: [userId], references: [id])
 }
 
 // -------- TEACHER PROFILE --------
@@ -123,8 +121,7 @@ model TeacherProfile {
   expertise    String[]
   bio          String?
   subjectsType String[]
-
-  user User @relation(fields: [userId], references: [id])
+  user         User     @relation(fields: [userId], references: [id])
 }
 
 model Class {
