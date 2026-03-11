@@ -14,8 +14,12 @@ router.post(
   ClassController.createClass,
 );
 
-router.get("/", auth(Role.ADMIN), ClassController.getAllClasses);
+router.get("/", auth(Role.ADMIN, Role.TEACHER), ClassController.getAllClasses);
 
-router.delete("/:id", auth(Role.ADMIN), ClassController.deleteClass);
+router.delete(
+  "/:id",
+  auth(Role.ADMIN, Role.TEACHER),
+  ClassController.deleteClass,
+);
 
 export const ClassRoutes = router;
