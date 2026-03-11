@@ -2,7 +2,7 @@ import ApiError from '../../errors/apiError';
 import { prisma } from '../../prisma/prisma';
 
 const startClass = async (courseId: string, userId: string) => {
-  const course = await prisma.course.findUnique({
+  const course = await prisma.courseNameGenerator.findUnique({
     where: { id: courseId, teacherId: userId },
   });
 
@@ -12,7 +12,7 @@ const startClass = async (courseId: string, userId: string) => {
   const dateOnly = new Date(now.toISOString().split('T')[0]);
 
   const endTime = new Date(
-    now.getTime() + course.estimatedClassDuration * 60000,
+    now.getTime() + course.estimatedDurationMinPerClass * 60000,
   );
 
   return prisma.attendance.create({

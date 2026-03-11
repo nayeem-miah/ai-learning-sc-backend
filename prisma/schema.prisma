@@ -79,9 +79,7 @@ model User {
 
   enrollments    Enrollment[]
   lessonProgress LessonProgress[]
-  quizAttempts   QuizAttempt[]
   notifications  Notification[]
-  courses        Course[]
   studentClasses StudentClass[]
 
   linksFrom         UserLink[]         @relation("FromUser")
@@ -125,72 +123,6 @@ model TeacherProfile {
   user         User     @relation(fields: [userId], references: [id])
 }
 
-// -------- COURSE --------
-
-// * added nayeem
-model Course {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
-
-  title       String
-  subject     String
-  description String?
-  isPublished Boolean @default(false)
-
-  // Schedule
-  startDate     DateTime?
-  startTime     String?
-  endTime       String?
-  // ===== Course Duration =====
-  courseType    CourseType // SEMESTER | FULL_YEAR
-  semesterCount Int? // only for FULL_YEAR
-
-  quizzesPerModule   Int
-  totalQuizQuestions Int
-  hasMidterm         Boolean @default(false)
-  hasFinal           Boolean @default(false)
-
-  // ===== Learning Benchmarks =====
-  masteryRequirement     Int // percentage (e.g. 75)
-  totalModules           Int
-  estimatedClassDuration Int // minutes per class
-
-  // ===== AI / System Flags =====
-  diagnosticTest   Boolean @default(false)
-  retestingAllowed Boolean @default(false)
-  retestingCount   Int?
-
-  // ===== Relations =====
-  teacherId String @db.ObjectId
-  teacher   User   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-
-  modules     Module[]
-  enrollments Enrollment[]
-
-  // ===== Timestamps =====
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  classId     String?      @db.ObjectId
-  class       Class?       @relation(fields: [classId], references: [id], onDelete: Cascade)
-  attendances Attendance[]
-
-  lessons Lesson[]
-}
-
-// * added nayeem
-model Module {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
-
-  courseId String @db.ObjectId
-  title    String
-  order    Int
-
-  lessons Lesson[]
-  quizzes Quiz[]
-  course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-}
-
 model Class {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
@@ -199,7 +131,6 @@ model Class {
 
   // Relations
   students      StudentClass[]
-  courses       Course[]
   totalStudents Int            @default(0)
 
   createdAt DateTime @default(now())
@@ -223,6 +154,7 @@ model StudentClass {
   @@unique([studentId, classId])
 }
 
+<<<<<<< HEAD
 // * added nayeem
 model Lesson {
   id String @id @default(auto()) @map("_id") @db.ObjectId
@@ -326,6 +258,8 @@ model Question {
   quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
 }
 
+=======
+>>>>>>> 3d3370681427981dac584938f6f3b8465015bece
 // -------- LESSON PROGRESS (NO SKIP) --------
 
 model LessonProgress {
@@ -335,8 +269,8 @@ model LessonProgress {
   isCompleted Boolean   @default(false)
   completedAt DateTime?
 
-  student User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  lesson  Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  student  User                   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  aiLesson CourseLectureGenerator @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, lessonId])
 }
@@ -348,8 +282,13 @@ model Enrollment {
   progressPercentage Float   @default(0)
   currentLessonId    String? @db.ObjectId
 
+<<<<<<< HEAD
   student User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
   course  Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+=======
+  student  User                 @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  aiCourse CourseNameGenerator? @relation(fields: [aiCourseId], references: [id], onDelete: Cascade)
+>>>>>>> 3d3370681427981dac584938f6f3b8465015bece
 
   @@unique([studentId, courseId])
 }
@@ -409,8 +348,13 @@ model Attendance {
 
   createdAt DateTime @default(now())
 
+<<<<<<< HEAD
   course  Course             @relation(fields: [courseId], references: [id], onDelete: Cascade)
   records AttendanceRecord[]
+=======
+  aiCourse CourseNameGenerator? @relation(fields: [aiCourseId], references: [id], onDelete: Cascade)
+  records  AttendanceRecord[]
+>>>>>>> 3d3370681427981dac584938f6f3b8465015bece
 
   @@unique([courseId, date])
 }
@@ -468,10 +412,31 @@ model CourseNameGenerator {
 
   createdAt DateTime @default(now())
 
+<<<<<<< HEAD
   // Relations
   user    UserId                   @relation(fields: [uniqueUserId], references: [userId])
   modules CourseLectureGenerator[]
   quizzes QuizQuestion[]
+=======
+  // ── Relations
+  // Linked AI user
+  user UserId @relation(fields: [uniqueUserId], references: [userId], onDelete: Cascade)
+
+  teacherId String? @db.ObjectId
+  teacher   User?   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  hasMidterm Boolean @default(false)
+  hasFinal   Boolean @default(false)
+
+  // Linked Class (optional — course may or may not be assigned to a class)
+  classId String? @db.ObjectId
+  class   Class?  @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  modules     CourseLectureGenerator[]
+  quizzes     QuizQuestion[]
+  enrollments Enrollment[]
+  attendances Attendance[]
+>>>>>>> 3d3370681427981dac584938f6f3b8465015bece
 }
 
 // -------- COURSE LECTURE GENERATOR --------
@@ -490,8 +455,14 @@ model CourseLectureGenerator {
   updatedAt DateTime @updatedAt
 
   // Relations
+<<<<<<< HEAD
   course        CourseNameGenerator @relation(fields: [uniqueSessionId], references: [uniqueSessionId])
   quizQuestions QuizQuestion[]
+=======
+  course           CourseNameGenerator @relation(fields: [uniqueSessionId], references: [uniqueSessionId], onDelete: Cascade)
+  quizQuestions    QuizQuestion[]
+  lessonProgresses LessonProgress[]
+>>>>>>> 3d3370681427981dac584938f6f3b8465015bece
 
   // Prevent duplicate module numbers per session
   @@unique([uniqueSessionId, moduleNumber])
@@ -502,9 +473,10 @@ model CourseLectureGenerator {
 model QuizQuestion {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  questionId      String  @unique // e.g. QID-xxxx
-  uniqueSessionId String // FK → CourseNameGenerator.uniqueSessionId
-  moduleId        String?
+  questionId         String  @unique // our unique key
+  originalQuestionId String? // the AI's original question_id
+  uniqueSessionId    String // FK → CourseNameGenerator.uniqueSessionId
+  moduleId           String?
 
   questionNumber Int
   questionText   String
@@ -524,7 +496,7 @@ model QuizQuestion {
 }
 
 // -------- QUIZ ANSWER --------
-// Stores user-submitted answers
+
 model QuizAnswer {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 

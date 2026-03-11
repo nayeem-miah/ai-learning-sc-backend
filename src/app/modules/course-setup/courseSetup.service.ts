@@ -142,8 +142,9 @@ const submitAnswerToAI = async (payload: {
   correct_answer: string;
   message: string;
 }> => {
+  console.log('----------------------- calling ai apis', payload);
   const response = await aiClient.post('/api/v1/quiz/submit-answer', payload);
-
+  console.log(response.data);
   const result = response.data;
   return {
     success: result.success ?? true,
@@ -448,6 +449,7 @@ const courseSetup = async (body: TCourseSetupPayload) => {
                 },
                 create: {
                   questionId: uniqueQuestionKey,
+                  originalQuestionId: q.question_id,
                   uniqueSessionId,
                   moduleId: savedModule!.id,
                   questionNumber: q.question_number,
@@ -551,7 +553,20 @@ const submitQuizAnswer = async (body: {
   selected_answer: string;
 }) => {
   try {
-    const result = await submitAnswerToAI(body);
+    // 1. Find the question in our DB to get its original AI questionId
+    const question = await prisma.quizQuestion.findUnique({
+      where: { questionId: body.question_id },
+    });
+
+    if (!question) {
+      throw new ApiError(404, `Question not found in database: ${body.question_id}`);
+    }
+
+    // 2. Submit the ORIGINAL ID to AI
+    const result = await submitAnswerToAI({
+      ...body,
+      question_id: question.originalQuestionId || question.questionId,
+    });
 
     //  DB SAVE: QuizAnswer collection
     await prisma.quizAnswer.create({
@@ -947,6 +962,185 @@ const getModuleQuizResultPublic = async (query: {
   };
 };
 
+const getCourseById = async (id: string) => {
+  const course = await prisma.courseNameGenerator.findUnique({
+    where: { id },
+    include: {
+      user: {
+        select: { userId: true, isActive: true },
+      },
+      class: true,
+      modules: {
+        orderBy: { moduleNumber: 'asc' },
+        include: {
+          quizQuestions: {
+            orderBy: { questionNumber: 'asc' },
+          },
+        },
+      },
+    },
+  });
+
+  if (!course) {
+    throw new ApiError(404, 'Course not found');
+  }
+
+  return course;
+};
+
+const updateCourse = async (id: string, payload: any) => {
+  const isExist = await prisma.courseNameGenerator.findUnique({
+    where: { id },
+  });
+
+  if (!isExist) {
+    throw new ApiError(404, 'Course not found');
+  }
+
+  // Sanitize payload to only allowed fields
+  const updateData: any = {};
+  const allowedFields = [
+    'courseName',
+    'subject',
+    'description',
+    'isPublished',
+    'startDate',
+    'startTime',
+    'endTime',
+    'targetGradeLevel',
+    'courseLength',
+    'semesterCount',
+    'teacherId',
+    'masteryRequirement',
+    'totalModules',
+  ];
+
+  allowedFields.forEach((field) => {
+    if (payload[field] !== undefined) {
+      updateData[field] = payload[field];
+    }
+  });
+
+  return await prisma.courseNameGenerator.update({
+    where: { id },
+    data: updateData,
+  });
+};
+
+const updateLesson = async (id: string, payload: any) => {
+  const isExist = await prisma.courseLectureGenerator.findUnique({
+    where: { id },
+  });
+
+  if (!isExist) {
+    throw new ApiError(404, 'Lesson/Module not found');
+  }
+
+  return await prisma.courseLectureGenerator.update({
+    where: { id },
+    data: {
+      moduleTitle: payload.moduleTitle,
+      introduction: payload.introduction,
+      studyTopics: payload.studyTopics,
+      voiceData: payload.voiceData,
+    },
+  });
+};
+
+const updateQuiz = async (id: string, payload: any) => {
+  const isExist = await prisma.quizQuestion.findUnique({
+    where: { id },
+  });
+
+  if (!isExist) {
+    throw new ApiError(404, 'Quiz question not found');
+  }
+
+  return await prisma.quizQuestion.update({
+    where: { id },
+    data: {
+      questionText: payload.questionText,
+      optionA: payload.optionA,
+      optionB: payload.optionB,
+      optionC: payload.optionC,
+      optionD: payload.optionD,
+      correctAnswer: payload.correctAnswer,
+    },
+  });
+};
+
+const deleteQuiz = async (id: string) => {
+  const isExist = await prisma.quizQuestion.findUnique({
+    where: { id },
+  });
+
+  if (!isExist) {
+    throw new ApiError(404, 'Quiz question not found');
+  }
+
+  return await prisma.quizQuestion.delete({
+    where: { id },
+  });
+};
+
+const deleteCourse = async (id: string) => {
+  const isExist = await prisma.courseNameGenerator.findUnique({
+    where: { id },
+  });
+
+  if (!isExist) {
+    throw new ApiError(404, 'Course not found');
+  }
+
+  return await prisma.courseNameGenerator.delete({
+    where: { id },
+  });
+};
+
+const getStudentPublishedCourses = async (studentId: string) => {
+  return await prisma.courseNameGenerator.findMany({
+    where: {
+      isPublished: true,
+      enrollments: {
+        some: {
+          studentId,
+        },
+      },
+    },
+    include: {
+      modules: {
+        orderBy: { moduleNumber: 'asc' },
+        include: {
+          quizQuestions: {
+            orderBy: { questionNumber: 'asc' },
+          },
+        },
+      },
+      class: true,
+    },
+  });
+};
+
+const getTeacherPublishedCourses = async (teacherId: string) => {
+  return await prisma.courseNameGenerator.findMany({
+    where: {
+      isPublished: true,
+      teacherId,
+    },
+    include: {
+      modules: {
+        orderBy: { moduleNumber: 'asc' },
+        include: {
+          quizQuestions: {
+            orderBy: { questionNumber: 'asc' },
+          },
+        },
+      },
+      class: true,
+    },
+  });
+};
+
 export const CourseSetupService = {
   courseSetup,
   generateQuiz,
@@ -954,7 +1148,15 @@ export const CourseSetupService = {
   getQuizResults,
   getAllCourses,
   getCourseBySession,
+  getCourseById,
+  updateCourse,
+  updateLesson,
+  updateQuiz,
+  deleteQuiz,
   submitModuleQuiz,
   getModuleQuizResult,
   getModuleQuizResultPublic,
+  deleteCourse,
+  getStudentPublishedCourses,
+  getTeacherPublishedCourses,
 };

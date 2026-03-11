@@ -271,6 +271,98 @@ const getModuleQuizResultPublic = catchAsync(
   },
 );
 
+const getCourseById = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const result = await CourseSetupService.getCourseById(id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Course fetched successfully',
+    data: result,
+  });
+});
+
+const updateCourse = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const result = await CourseSetupService.updateCourse(id, req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Course updated successfully',
+    data: result,
+  });
+});
+
+const updateLesson = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const result = await CourseSetupService.updateLesson(id, req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Lesson updated successfully',
+    data: result,
+  });
+});
+
+const updateQuiz = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const result = await CourseSetupService.updateQuiz(id, req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Quiz updated successfully',
+    data: result,
+  });
+});
+
+const deleteQuiz = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const result = await CourseSetupService.deleteQuiz(id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Quiz question deleted successfully',
+    data: result,
+  });
+});
+
+const deleteCourse = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const result = await CourseSetupService.deleteCourse(id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Course deleted successfully',
+    data: result,
+  });
+});
+
+const getStudentPublishedCourses = catchAsync(
+  async (req: Request & { user?: any }, res: Response) => {
+    const studentId = req.user.userId;
+    const result = await CourseSetupService.getStudentPublishedCourses(studentId);
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: 'Student published courses fetched successfully',
+      data: result,
+    });
+  },
+);
+
+const getTeacherPublishedCourses = catchAsync(
+  async (req: Request & { user?: any }, res: Response) => {
+    const teacherId = req.user.userId;
+    const result = await CourseSetupService.getTeacherPublishedCourses(teacherId);
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: 'Teacher published courses fetched successfully',
+      data: result,
+    });
+  },
+);
+
 export const CourseSetupController = {
   courseSetup,
   generateQuiz,
@@ -278,7 +370,15 @@ export const CourseSetupController = {
   getQuizResults,
   getAllCourses,
   getCourseBySession,
+  getCourseById,
+  updateCourse,
+  updateLesson,
+  updateQuiz,
+  deleteQuiz,
   submitModuleQuiz,
   getModuleQuizResult,
   getModuleQuizResultPublic,
+  deleteCourse,
+  getStudentPublishedCourses,
+  getTeacherPublishedCourses,
 };
