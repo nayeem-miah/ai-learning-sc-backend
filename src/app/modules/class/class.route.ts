@@ -14,7 +14,11 @@ router.post(
   ClassController.createClass,
 );
 
-router.get("/", auth(Role.ADMIN, Role.TEACHER), ClassController.getAllClasses);
+router.get(
+  "/",
+  auth(Role.ADMIN, Role.TEACHER, Role.STUDENT),
+  ClassController.getAllClasses,
+);
 
 router.delete(
   "/:id",

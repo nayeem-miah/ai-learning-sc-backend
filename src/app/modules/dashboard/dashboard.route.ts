@@ -7,8 +7,8 @@ const router = Router();
 
 router.get(
   "/",
-  auth(Role.ADMIN, Role.TEACHER),
-  DashboardController.getDashboardData
+  auth(Role.ADMIN, Role.TEACHER, Role.STUDENT),
+  DashboardController.getDashboardData,
 );
 
 export const DashboardRoutes = router;
