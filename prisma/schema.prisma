@@ -134,9 +134,11 @@ model Class {
   students      StudentClass[]
   totalStudents Int            @default(0)
 
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  courseNameGenerators CourseNameGenerator[]
+  // AI-generated courses linked to this class
+  aiCourses CourseNameGenerator[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([gradeLevel]) // Grade 9 + A duplicate hobe na
 }
@@ -174,7 +176,7 @@ model LessonProgress {
 model Enrollment {
   id                 String  @id @default(auto()) @map("_id") @db.ObjectId
   studentId          String  @db.ObjectId
-  courseId           String  @db.ObjectId
+  courseId           String? @db.ObjectId
   aiCourseId         String? @db.ObjectId
   progressPercentage Float   @default(0)
   currentLessonId    String? @db.ObjectId
@@ -183,6 +185,7 @@ model Enrollment {
   aiCourse CourseNameGenerator? @relation(fields: [aiCourseId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, courseId])
+  @@unique([studentId, aiCourseId])
 }
 
 // -------- BADGE --------
@@ -232,7 +235,7 @@ model Invite {
 
 model Attendance {
   id         String   @id @default(auto()) @map("_id") @db.ObjectId
-  courseId   String   @db.ObjectId
+  courseId   String?  @db.ObjectId
   aiCourseId String?  @db.ObjectId
   date       DateTime
   startTime  DateTime
@@ -277,15 +280,22 @@ model CourseNameGenerator {
   uniqueSessionId String @unique
   uniqueUserId    String
 
-  // Course identity
+  // ── Course identity (mirrors Course model)
   courseName          String
   generatedCourseName String?
+  description         String? // Course.description
   subject             String
   targetGradeLevel    String
   courseLength        String
-  courseType          String?
+  courseType          String? // Course.courseType (SEMESTER | FULL_YEAR)
 
-  // Course config (mirrors AI CourseInput)
+  // ── Publishing & Schedule (mirrors Course model)
+  isPublished Boolean   @default(false) // Course.isPublished
+  startDate   DateTime? // Course.startDate
+  startTime   String? // Course.startTime
+  endTime     String? // Course.endTime
+
+  // ── Course config (mirrors AI CourseInput)
   semesterCount                Int     @default(1)
   diagnosticTestBeforeCourse   Boolean @default(false)
   retestingAllowed             Boolean @default(false)
@@ -299,6 +309,7 @@ model CourseNameGenerator {
   estimatedDurationMinPerClass Int     @default(0)
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // ── Relations
   // Linked AI user
@@ -321,7 +332,6 @@ model CourseNameGenerator {
 }
 
 // -------- COURSE LECTURE GENERATOR --------
-// Stores each AI-generated module/lecture content
 model CourseLectureGenerator {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
@@ -366,8 +376,8 @@ model QuizQuestion {
   createdAt DateTime @default(now())
 
   // Relations
-  course  CourseNameGenerator     @relation(fields: [uniqueSessionId], references: [uniqueSessionId])
-  module  CourseLectureGenerator? @relation(fields: [moduleId], references: [id])
+  course  CourseNameGenerator     @relation(fields: [uniqueSessionId], references: [uniqueSessionId], onDelete: Cascade)
+  module  CourseLectureGenerator? @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   answers QuizAnswer[]
 }
 
@@ -386,6 +396,6 @@ model QuizAnswer {
   submittedAt DateTime @default(now())
 
   // Relations
-  user     UserId       @relation(fields: [uniqueUserId], references: [userId])
-  question QuizQuestion @relation(fields: [questionId], references: [questionId])
+  user     UserId       @relation(fields: [uniqueUserId], references: [userId], onDelete: Cascade)
+  question QuizQuestion @relation(fields: [questionId], references: [questionId], onDelete: Cascade)
 }

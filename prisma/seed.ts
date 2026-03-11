@@ -19,7 +19,7 @@ async function main() {
         email: adminEmail,
         password: hashedPassword,
         role: 'ADMIN',
-        profilePicture: 'https://i.ibb.co/5Yg7XjX/admin.png', // placeholder
+        profilePicture: 'https://i.ibb.co/5Yg7XjX/admin.png',
       },
     });
     console.log('Admin created successfully');
