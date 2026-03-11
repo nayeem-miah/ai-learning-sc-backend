@@ -27,9 +27,19 @@ router.get('/:session_id', CourseSetupController.getCourseBySession);
 
 router.patch('/:id', auth(Role.ADMIN), CourseSetupController.updateCourse);
 
-router.patch('/lesson/:id', auth(Role.ADMIN), CourseSetupController.updateLesson);
+router.patch(
+  '/lesson/:id',
+  auth(Role.ADMIN),
+  CourseSetupController.updateLesson,
+);
 
 router.patch('/quiz/:id', auth(Role.ADMIN), CourseSetupController.updateQuiz);
+
+router.patch(
+  '/remove-teacher/:id',
+  auth(Role.ADMIN),
+  CourseSetupController.removeTeacherFromCourse,
+);
 
 router.delete('/quiz/:id', auth(Role.ADMIN), CourseSetupController.deleteQuiz);
 

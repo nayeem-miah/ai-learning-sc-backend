@@ -1141,6 +1141,23 @@ const getTeacherPublishedCourses = async (teacherId: string) => {
   });
 };
 
+const removeTeacherFromCourse = async (courseId: string) => {
+  const isExist = await prisma.courseNameGenerator.findUnique({
+    where: { id: courseId },
+  });
+
+  if (!isExist) {
+    throw new ApiError(404, 'Course not found');
+  }
+
+  return await prisma.courseNameGenerator.update({
+    where: { id: courseId },
+    data: {
+      teacherId: null,
+    },
+  });
+};
+
 export const CourseSetupService = {
   courseSetup,
   generateQuiz,
@@ -1159,4 +1176,5 @@ export const CourseSetupService = {
   deleteCourse,
   getStudentPublishedCourses,
   getTeacherPublishedCourses,
+  removeTeacherFromCourse,
 };

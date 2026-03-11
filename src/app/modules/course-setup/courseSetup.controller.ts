@@ -363,6 +363,17 @@ const getTeacherPublishedCourses = catchAsync(
   },
 );
 
+const removeTeacherFromCourse = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const result = await CourseSetupService.removeTeacherFromCourse(id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Teacher removed from course successfully',
+    data: result,
+  });
+});
+
 export const CourseSetupController = {
   courseSetup,
   generateQuiz,
@@ -381,4 +392,5 @@ export const CourseSetupController = {
   deleteCourse,
   getStudentPublishedCourses,
   getTeacherPublishedCourses,
+  removeTeacherFromCourse,
 };
