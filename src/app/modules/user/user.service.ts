@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Role, Status } from '@prisma/client';
 import bcrypt from 'bcryptjs';
@@ -329,22 +330,24 @@ const createUserLink = async (
     throw new ApiError(401, 'Already linked');
   }
 
-  // create mutual link
-  const userLink = await prisma.userLink.create({
-    data: {
-      fromId: loggedInUserId,
-      toId: targetUserId,
-    },
-  });
+  // create mutual link in transaction
+  return await prisma.$transaction(async (tx) => {
+    const userLink = await tx.userLink.create({
+      data: {
+        fromId: loggedInUserId,
+        toId: targetUserId,
+      },
+    });
 
-  await prisma.userLink.create({
-    data: {
-      fromId: targetUserId,
-      toId: loggedInUserId,
-    },
-  });
+    await tx.userLink.create({
+      data: {
+        fromId: targetUserId,
+        toId: loggedInUserId,
+      },
+    });
 
-  return userLink;
+    return userLink;
+  });
 };
 
 const removeUserLink = async (loggedInUserId: string, targetUserId: string) => {
@@ -361,107 +364,76 @@ const removeUserLink = async (loggedInUserId: string, targetUserId: string) => {
 };
 
 const getLinkedUsers = async (loggedInUserId: string) => {
-  const loggedInUser = await prisma.user.findUnique({
+  const loggedInUserRaw = await prisma.user.findUnique({
     where: { id: loggedInUserId },
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      email: true,
-      profilePicture: true,
-      role: true,
-      status: true,
-      isActive: true,
-      createdAt: true,
-      updatedAt: true,
-      studentProfile: {
-        select: {
-          id: true,
-          gradeLevel: true,
-          interests: true,
-          learningPreferences: true,
-          goals: true,
-          currentLevel: true,
-          aiUserId: true,
+    include: {
+      studentProfile: true,
+      studentClasses: {
+        include: {
+          class: true,
         },
       },
+      enrollments: true,
     },
   });
 
+  let loggedInUser = null;
+  if (loggedInUserRaw) {
+    const rawUser = loggedInUserRaw as any;
+    const enrollments = rawUser.enrollments || [];
+    const totalProgress = enrollments.reduce(
+      (sum: number, en: any) => sum + (en.progressPercentage || 0),
+      0,
+    );
+    const overallMastery =
+      enrollments.length > 0
+        ? Math.round(totalProgress / enrollments.length)
+        : 0;
+
+    const { enrollments: _, ...userWithoutEnrollments } = rawUser;
+    loggedInUser = { ...userWithoutEnrollments, overallMastery };
+  }
+
+  // Query only fromId to avoid duplicates in mutual links
   const links = await prisma.userLink.findMany({
-    where: {
-      OR: [{ fromId: loggedInUserId }, { toId: loggedInUserId }],
-    },
-    select: {
-      fromId: true,
-      toId: true,
-      from: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          profilePicture: true,
-          role: true,
-          status: true,
-          isActive: true,
-          createdAt: true,
-          updatedAt: true,
-          studentProfile: {
-            select: {
-              id: true,
-              gradeLevel: true,
-              interests: true,
-              learningPreferences: true,
-              goals: true,
-              currentLevel: true,
-              aiUserId: true,
-            },
-          },
-          studentClasses: {
-            include: {
-              class: true,
-            },
-          },
-        },
-      },
+    where: { fromId: loggedInUserId },
+    include: {
       to: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          profilePicture: true,
-          role: true,
-          status: true,
-          isActive: true,
-          createdAt: true,
-          updatedAt: true,
-          studentProfile: {
-            select: {
-              id: true,
-              gradeLevel: true,
-              interests: true,
-              learningPreferences: true,
-              goals: true,
-              currentLevel: true,
-              aiUserId: true,
-            },
-          },
+        include: {
+          studentProfile: true,
           studentClasses: {
             include: {
               class: true,
             },
           },
+          enrollments: true,
         },
       },
     },
   });
 
-  // 3️ Extract connected users
-  const linkedUsers = links.map((link) =>
-    link.fromId === loggedInUserId ? link.to : link.from,
-  );
+  const linkedUsers = links.map((link) => {
+    const user = link.to as any;
+    const enrollments = user.enrollments || [];
+
+    // Calculate average progress as overallMastery
+    const totalProgress = enrollments.reduce(
+      (sum: number, en: any) => sum + (en.progressPercentage || 0),
+      0,
+    );
+    const overallMastery =
+      enrollments.length > 0
+        ? Math.round(totalProgress / enrollments.length)
+        : 0;
+
+    // Remove enrollments from the final object to keep it clean
+    const { enrollments: _, ...userWithoutEnrollments } = user;
+
+    return {
+      ...userWithoutEnrollments,
+      overallMastery,
+    };
+  });
 
   return {
     loggedInUser,
