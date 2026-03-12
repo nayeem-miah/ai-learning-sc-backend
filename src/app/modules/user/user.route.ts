@@ -18,7 +18,7 @@ router.post(
 router.patch(
   '/update-profile',
   fileUpload.upload.single('file'),
-  auth(Role.STUDENT, Role.ADMIN),
+  auth(Role.STUDENT, Role.ADMIN, Role.TEACHER),
   UserController.updateProfile,
 );
 
