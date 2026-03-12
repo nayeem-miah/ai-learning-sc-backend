@@ -126,10 +126,10 @@ const updateProfile = async (userId: string, payload: any) => {
 
   // name update
   if (firstName) {
-    updateData.FirstName = firstName;
+    updateData.firstName = firstName;
   }
   if (lastName) {
-    updateData.LastName = lastName;
+    updateData.lastName = lastName;
   }
 
   // profile photo
