@@ -16,6 +16,8 @@ router.get(
   CourseSetupController.getStudentPublishedCourses,
 );
 
+//
+
 router.get(
   "/teacher/my-published-courses",
   auth(Role.TEACHER),
