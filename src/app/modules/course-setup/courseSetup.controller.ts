@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Request, Response } from 'express';
 import httpStatus from 'http-status';
 import catchAsync from '../../utils/catchAsync';
@@ -84,7 +85,8 @@ const generateQuiz = catchAsync(async (req: Request, res: Response) => {
   if (!unique_user_id || !unique_session_id || !module_number) {
     res.status(httpStatus.BAD_REQUEST).json({
       success: false,
-      message: 'unique_user_id, unique_session_id, and module_number are required',
+      message:
+        'unique_user_id, unique_session_id, and module_number are required',
     });
     return;
   }
@@ -340,7 +342,8 @@ const deleteCourse = catchAsync(async (req: Request, res: Response) => {
 const getStudentPublishedCourses = catchAsync(
   async (req: Request & { user?: any }, res: Response) => {
     const studentId = req.user.userId;
-    const result = await CourseSetupService.getStudentPublishedCourses(studentId);
+    const result =
+      await CourseSetupService.getStudentPublishedCourses(studentId);
     sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,
@@ -353,7 +356,8 @@ const getStudentPublishedCourses = catchAsync(
 const getTeacherPublishedCourses = catchAsync(
   async (req: Request & { user?: any }, res: Response) => {
     const teacherId = req.user.userId;
-    const result = await CourseSetupService.getTeacherPublishedCourses(teacherId);
+    const result =
+      await CourseSetupService.getTeacherPublishedCourses(teacherId);
     sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,
@@ -363,16 +367,18 @@ const getTeacherPublishedCourses = catchAsync(
   },
 );
 
-const removeTeacherFromCourse = catchAsync(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const result = await CourseSetupService.removeTeacherFromCourse(id);
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: 'Teacher removed from course successfully',
-    data: result,
-  });
-});
+const removeTeacherFromCourse = catchAsync(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const result = await CourseSetupService.removeTeacherFromCourse(id);
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: 'Teacher removed from course successfully',
+      data: result,
+    });
+  },
+);
 
 export const CourseSetupController = {
   courseSetup,

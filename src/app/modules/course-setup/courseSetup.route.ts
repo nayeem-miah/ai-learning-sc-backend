@@ -38,7 +38,7 @@ router.patch('/quiz/:id', auth(Role.ADMIN), CourseSetupController.updateQuiz);
 
 router.patch(
   '/remove-teacher/:id',
-  auth(Role.ADMIN),
+  auth(Role.ADMIN, Role.TEACHER),
   CourseSetupController.removeTeacherFromCourse,
 );
 
