@@ -185,7 +185,7 @@ model Enrollment {
   student  User                 @relation(fields: [studentId], references: [id], onDelete: Cascade)
   aiCourse CourseNameGenerator? @relation(fields: [aiCourseId], references: [id], onDelete: Cascade)
 
-  @@unique([studentId, aiCourseId])
+  @@unique([studentId, aiCourseId, courseId])
 }
 
 // -------- BADGE --------
