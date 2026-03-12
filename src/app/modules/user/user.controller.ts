@@ -29,6 +29,17 @@ const getAllStudents = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getAllTeachers = catchAsync(async (req: Request, res: Response) => {
+  const result = await UserService.getAllTeachers();
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Teachers fetched successfully",
+    data: result,
+  });
+});
+
 const getMyProfile = catchAsync(
   async (req: Request & { user?: any }, res: Response) => {
     const decodedUser = req.user as any;
@@ -183,6 +194,7 @@ const getLinkedUsers = catchAsync(async (req: Request & { user?: any }, res: Res
 export const UserController = {
   registerStudent,
   getAllStudents,
+  getAllTeachers,
   getStudentById,
   updateProfile,
   deleteStudent,
@@ -191,5 +203,5 @@ export const UserController = {
   deleteMe,
   createUserLink,
   removeUserLink,
-  getLinkedUsers
+  getLinkedUsers,
 };

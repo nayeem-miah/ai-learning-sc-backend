@@ -44,6 +44,7 @@ router.delete(
 
 // Student CRUD
 router.get("/", auth(), UserController.getAllStudents);
+router.get("/teachers", auth(Role.ADMIN, Role.STUDENT, Role.TEACHER), UserController.getAllTeachers);
 router.get("/me", auth(), UserController.getMyProfile);
 router.get("/:id", auth(), UserController.getStudentById);
 

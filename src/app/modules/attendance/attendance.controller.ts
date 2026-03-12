@@ -48,8 +48,11 @@ const getAttendanceSummary = catchAsync(async (req: Request & { user?: any }, re
 
 const getStudentAttendance = catchAsync(async (req: Request & { user?: any }, res: Response) => {
   const studentId = req.user.userId;
-  const { courseId } = req.params;
-  const { month, year } = req.query;
+  const { courseId: paramsCourseId } = req.params;
+  const { month, year, courseId: queryCourseId, course } = req.query;
+
+  // Use courseId from params if not 'all', otherwise fallback to query params
+  const courseId = paramsCourseId !== "all" ? paramsCourseId : (queryCourseId || course) as string;
 
   const result = await AttendanceService.getStudentAttendance(
     studentId, 

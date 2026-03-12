@@ -11,6 +11,12 @@ router.post('/setup', auth(Role.ADMIN), CourseSetupController.courseSetup);
 router.get('/all', CourseSetupController.getAllCourses);
 
 router.get(
+  '/student/progress-summary/:studentId?',
+  auth(Role.ADMIN, Role.TEACHER, Role.STUDENT),
+  CourseSetupController.getStudentProgressSummary,
+);
+
+router.get(
   '/student/my-published-courses',
   auth(Role.STUDENT),
   CourseSetupController.getStudentPublishedCourses,

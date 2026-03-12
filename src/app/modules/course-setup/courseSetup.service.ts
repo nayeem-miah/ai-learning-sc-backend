@@ -705,12 +705,15 @@ const getCourseBySession = async (uniqueSessionId: string) => {
   return course;
 };
 
-const submitModuleQuiz = async (body: {
-  unique_user_id: string;
-  unique_session_id: string;
-  module_id: string; // CourseLectureGenerator.id
-  answers: { question_id: string; selected_answer: string }[];
-}) => {
+const submitModuleQuiz = async (
+  studentId: string,
+  body: {
+    unique_user_id: string;
+    unique_session_id: string;
+    module_id: string; // CourseLectureGenerator.id
+    answers: { question_id: string; selected_answer: string }[];
+  },
+) => {
   // 1. Verify the module belongs to this session
   const module = await prisma.courseLectureGenerator.findFirst({
     where: {
@@ -761,7 +764,7 @@ const submitModuleQuiz = async (body: {
     } catch (err) {
       throw new ApiError(
         502,
-        `Failed to submit answer for question ${ans.question_id}: ${getAIError(err, "Unknown error")}`,
+        `Failed to submit answer for question ${ans.question_id}: ${getAIError(err, 'Unknown error')}`,
       );
     }
 
@@ -780,7 +783,6 @@ const submitModuleQuiz = async (body: {
   }
 
   // 4. Delete any previous answers by this user for this module's questions
-  //    so retesting gives a fresh result
   const moduleQuestionIds = module.quizQuestions.map((q) => q.questionId);
   await prisma.quizAnswer.deleteMany({
     where: {
@@ -800,6 +802,12 @@ const submitModuleQuiz = async (body: {
       correctAnswer: r.correct_answer,
       isCorrect: r.is_correct,
     })),
+  });
+
+  // Save aiUserId to StudentProfile using the INTERNAL studentId
+  await prisma.studentProfile.update({
+    where: { userId: studentId },
+    data: { aiUserId: body.unique_user_id } as any,
   });
 
   // 6. Calculate result summary
@@ -1161,6 +1169,109 @@ const removeTeacherFromCourse = async (courseId: string) => {
   });
 };
 
+const getStudentProgressSummary = async (
+  studentId: string,
+  uniqueUserId?: string,
+) => {
+  // If uniqueUserId (aiUserId) is not provided, try to find it from StudentProfile
+  if (!uniqueUserId) {
+    const profile = await prisma.studentProfile.findUnique({
+      where: { userId: studentId },
+    });
+    uniqueUserId = (profile as any)?.aiUserId || undefined;
+  }
+
+  const enrollments = await prisma.enrollment.findMany({
+    where: { studentId },
+    include: {
+      aiCourse: {
+        include: {
+          modules: {
+            orderBy: { moduleNumber: 'asc' },
+            include: {
+              lessonProgresses: {
+                where: { studentId },
+              },
+              quizQuestions: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const summary = await Promise.all(
+    enrollments.map(async (enrollment) => {
+      const course = enrollment.aiCourse;
+      if (!course) return null;
+
+      const totalModules = course.totalModules;
+      const completedModules = course.modules.filter(
+        (m) =>
+          m.lessonProgresses.length > 0 && m.lessonProgresses[0].isCompleted,
+      ).length;
+
+      const progressPercentage =
+        totalModules > 0
+          ? Math.round((completedModules / totalModules) * 100)
+          : 0;
+
+      let overallMastery = 0;
+      let modulesWithQuizzes = 0;
+      let totalScore = 0;
+
+      const lessons = await Promise.all(
+        course.modules.map(async (mod) => {
+          const isCompleted =
+            mod.lessonProgresses.length > 0 &&
+            mod.lessonProgresses[0].isCompleted;
+
+          let quizScore = null;
+          if (uniqueUserId) {
+            const questionIds = mod.quizQuestions.map((q) => q.questionId);
+            const answers = await prisma.quizAnswer.findMany({
+              where: {
+                uniqueUserId,
+                uniqueSessionId: course.uniqueSessionId,
+                questionId: { in: questionIds },
+              },
+            });
+
+            if (answers.length > 0) {
+              const correct = answers.filter((a) => a.isCorrect).length;
+              quizScore = Math.round((correct / answers.length) * 100);
+              totalScore += quizScore;
+              modulesWithQuizzes++;
+            }
+          }
+
+          return {
+            lessonId: mod.id,
+            lessonTitle: mod.moduleTitle,
+            lessonNumber: mod.moduleNumber,
+            isCompleted,
+            quizScore,
+          };
+        }),
+      );
+
+      if (modulesWithQuizzes > 0) {
+        overallMastery = Math.round(totalScore / modulesWithQuizzes);
+      }
+
+      return {
+        courseId: course.id,
+        courseName: course.courseName || course.generatedCourseName,
+        overallProgress: progressPercentage,
+        overallMastery,
+        lessons,
+      };
+    }),
+  );
+
+  return summary.filter((s) => s !== null);
+};
+
 export const CourseSetupService = {
   courseSetup,
   generateQuiz,
@@ -1180,4 +1291,5 @@ export const CourseSetupService = {
   getStudentPublishedCourses,
   getTeacherPublishedCourses,
   removeTeacherFromCourse,
+  getStudentProgressSummary,
 };
