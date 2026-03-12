@@ -110,6 +110,7 @@ model StudentProfile {
   learningPreferences String[]
   goals               String?
   currentLevel        String?
+  aiUserId            String?
   user                User     @relation(fields: [userId], references: [id])
 }
 

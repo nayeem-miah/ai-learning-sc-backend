@@ -6,6 +6,7 @@ import { AIQuizRoutes } from '../modules/course-setup/aiQuiz.route';
 import { CourseSetupRoutes } from '../modules/course-setup/courseSetup.route';
 import { InviteRoutes } from '../modules/invitation/invitation.route';
 import { UserRoutes } from '../modules/user/user.route';
+import { DashboardRoutes } from '../modules/dashboard/dashboard.route';
 
 const router = Router();
 
@@ -26,5 +27,6 @@ router.use('/attendance', AttendanceRoutes);
 // ── AI Course Setup & Quiz System
 router.use('/course', CourseSetupRoutes);
 router.use('/quiz', AIQuizRoutes);
+router.use('/dashboard', DashboardRoutes);
 
 export default router;

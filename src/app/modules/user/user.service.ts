@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Role, Status } from "@prisma/client";
-import bcrypt from "bcryptjs";
-import httpStatus from "http-status";
-import ApiError from "../../errors/apiError";
-import { prisma } from "../../prisma/prisma";
+import { Role, Status } from '@prisma/client';
+import bcrypt from 'bcryptjs';
+import httpStatus from 'http-status';
+import ApiError from '../../errors/apiError';
+import { prisma } from '../../prisma/prisma';
 
 const registerStudent = async (payload: any) => {
   const { firstName, lastName, email, password, gradeLevel } = payload;
@@ -13,13 +13,22 @@ const registerStudent = async (payload: any) => {
   });
 
   if (existingUser) {
-    throw new ApiError(409, "User already exists");
+    throw new ApiError(409, 'User already exists');
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
 
   // 🔐 TRANSACTION
   const result = await prisma.$transaction(async (tx) => {
+    // 1. Verify Class exists
+    const targetClass = await tx.class.findUnique({
+      where: { id: gradeLevel },
+    });
+
+    if (!targetClass) {
+      throw new ApiError(404, 'Class not found');
+    }
+
     const user = await tx.user.create({
       data: {
         firstName,
@@ -29,16 +38,52 @@ const registerStudent = async (payload: any) => {
         role: Role.STUDENT,
         status: Status.ACTIVE,
         profilePicture:
-          "https://i.ibb.co.com/q2gwGfV/356306451-54b19ada-d53e-4ee9-8882-9dfed1bf1396.jpg",
+          'https://i.ibb.co.com/q2gwGfV/356306451-54b19ada-d53e-4ee9-8882-9dfed1bf1396.jpg',
       },
     });
 
     await tx.studentProfile.create({
       data: {
         userId: user.id,
-        gradeLevel,
+        gradeLevel: targetClass.gradeLevel, // Use actual grade name
       },
     });
+
+    // 2. Link Student to Class
+    await tx.studentClass.create({
+      data: {
+        studentId: user.id,
+        classId: targetClass.id,
+      },
+    });
+
+    // 3. Update total students count in Class
+    await tx.class.update({
+      where: { id: targetClass.id },
+      data: {
+        totalStudents: { increment: 1 },
+      },
+    });
+
+    // ── AUTO-ENROLLMENT ──
+    // Find all courses that match the student's grade level
+    const matchingCourses = await tx.courseNameGenerator.findMany({
+      where: {
+        targetGradeLevel: targetClass.gradeLevel,
+      },
+    });
+
+    if (matchingCourses.length > 0) {
+      const enrollmentData = matchingCourses.map((course) => ({
+        studentId: user.id,
+        aiCourseId: course.id,
+        courseId: null,
+      }));
+
+      await tx.enrollment.createMany({
+        data: enrollmentData as any,
+      });
+    }
 
     return user;
   });
@@ -60,11 +105,16 @@ const getAllStudents = async (query: Record<string, any>) => {
       where: whereCondition,
       include: {
         studentProfile: true,
+        studentClasses: {
+          include: {
+            class: true,
+          },
+        },
       },
       skip,
       take: limit,
       orderBy: {
-        createdAt: "desc",
+        createdAt: 'desc',
       },
     }),
     prisma.user.count({
@@ -92,6 +142,11 @@ const getMyProfile = async (userId: string) => {
     },
     include: {
       studentProfile: true,
+      studentClasses: {
+        include: {
+          class: true,
+        },
+      },
     },
   });
   return result;
@@ -101,10 +156,15 @@ const getStudentById = async (id: string) => {
   const result = await prisma.user.findUniqueOrThrow({
     where: {
       id,
-      role: "STUDENT",
+      role: 'STUDENT',
     },
     include: {
       studentProfile: true,
+      studentClasses: {
+        include: {
+          class: true,
+        },
+      },
     },
   });
   return result;
@@ -119,7 +179,7 @@ const updateProfile = async (userId: string, payload: any) => {
   });
 
   if (!user) {
-    throw new Error("User not found");
+    throw new Error('User not found');
   }
 
   const updateData: any = {};
@@ -141,7 +201,7 @@ const updateProfile = async (userId: string, payload: any) => {
   if (currentPassword && newPassword) {
     const isMatch = await bcrypt.compare(currentPassword, user.password);
     if (!isMatch) {
-      throw new Error("Current password is incorrect");
+      throw new Error('Current password is incorrect');
     }
     updateData.password = await bcrypt.hash(newPassword, 10);
   }
@@ -170,7 +230,7 @@ const toggleUserRole = async (userId: string) => {
   });
 
   if (!user) {
-    throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
   }
 
   // 🔁 toggle logic
@@ -227,10 +287,13 @@ const deleteMe = async (userId: string) => {
   return result;
 };
 
-
-const createUserLink = async (loggedInUserId: string, email: string, password: string) => {
+const createUserLink = async (
+  loggedInUserId: string,
+  email: string,
+  password: string,
+) => {
   if (!email || !password) {
-    throw new ApiError(400, "Email and password are required");
+    throw new ApiError(400, 'Email and password are required');
   }
 
   const targetUser = await prisma.user.findUniqueOrThrow({
@@ -238,18 +301,18 @@ const createUserLink = async (loggedInUserId: string, email: string, password: s
   });
 
   if (!targetUser) {
-    throw new ApiError(404, "User not found");
+    throw new ApiError(404, 'User not found');
   }
 
   const isMatch = await bcrypt.compare(password, targetUser.password);
   if (!isMatch) {
-    throw new ApiError(401, "Invalid password");
+    throw new ApiError(401, 'Invalid password');
   }
 
   const targetUserId = targetUser.id;
 
   if (loggedInUserId === targetUserId) {
-    throw new Error("You cannot link yourself");
+    throw new Error('You cannot link yourself');
   }
 
   // check already linked
@@ -263,7 +326,7 @@ const createUserLink = async (loggedInUserId: string, email: string, password: s
   });
 
   if (existing) {
-    throw new ApiError(401, "Already linked");
+    throw new ApiError(401, 'Already linked');
   }
 
   // create mutual link
@@ -284,7 +347,6 @@ const createUserLink = async (loggedInUserId: string, email: string, password: s
   return userLink;
 };
 
-
 const removeUserLink = async (loggedInUserId: string, targetUserId: string) => {
   await prisma.userLink.deleteMany({
     where: {
@@ -295,11 +357,10 @@ const removeUserLink = async (loggedInUserId: string, targetUserId: string) => {
     },
   });
 
-  return { message: "User unlinked successfully" };
+  return { message: 'User unlinked successfully' };
 };
 
 const getLinkedUsers = async (loggedInUserId: string) => {
-
   const loggedInUser = await prisma.user.findUnique({
     where: { id: loggedInUserId },
     select: {
@@ -321,18 +382,15 @@ const getLinkedUsers = async (loggedInUserId: string) => {
           learningPreferences: true,
           goals: true,
           currentLevel: true,
+          aiUserId: true,
         },
       },
     },
   });
 
-
   const links = await prisma.userLink.findMany({
     where: {
-      OR: [
-        { fromId: loggedInUserId },
-        { toId: loggedInUserId },
-      ],
+      OR: [{ fromId: loggedInUserId }, { toId: loggedInUserId }],
     },
     select: {
       fromId: true,
@@ -357,6 +415,12 @@ const getLinkedUsers = async (loggedInUserId: string) => {
               learningPreferences: true,
               goals: true,
               currentLevel: true,
+              aiUserId: true,
+            },
+          },
+          studentClasses: {
+            include: {
+              class: true,
             },
           },
         },
@@ -381,6 +445,12 @@ const getLinkedUsers = async (loggedInUserId: string) => {
               learningPreferences: true,
               goals: true,
               currentLevel: true,
+              aiUserId: true,
+            },
+          },
+          studentClasses: {
+            include: {
+              class: true,
             },
           },
         },
@@ -389,8 +459,8 @@ const getLinkedUsers = async (loggedInUserId: string) => {
   });
 
   // 3️ Extract connected users
-  const linkedUsers = links.map(link =>
-    link.fromId === loggedInUserId ? link.to : link.from
+  const linkedUsers = links.map((link) =>
+    link.fromId === loggedInUserId ? link.to : link.from,
   );
 
   return {
@@ -398,7 +468,6 @@ const getLinkedUsers = async (loggedInUserId: string) => {
     linkedUsers,
   };
 };
-
 
 export const UserService = {
   registerStudent,

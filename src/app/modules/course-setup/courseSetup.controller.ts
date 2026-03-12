@@ -187,7 +187,7 @@ const getCourseBySession = catchAsync(async (req: Request, res: Response) => {
 });
 
 // Submit all answers for a single module at once (bulk)
-const submitModuleQuiz = catchAsync(async (req: Request, res: Response) => {
+const submitModuleQuiz = catchAsync(async (req: Request & { user?: any }, res: Response) => {
   const { unique_user_id, unique_session_id, module_id, answers } = req.body;
 
   if (
@@ -205,12 +205,15 @@ const submitModuleQuiz = catchAsync(async (req: Request, res: Response) => {
     return;
   }
 
-  const result = await CourseSetupService.submitModuleQuiz({
-    unique_user_id,
-    unique_session_id,
-    module_id,
-    answers,
-  });
+  const result = await CourseSetupService.submitModuleQuiz(
+    req.user.userId,
+    {
+      unique_user_id,
+      unique_session_id,
+      module_id,
+      answers,
+    }
+  );
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -380,6 +383,26 @@ const removeTeacherFromCourse = catchAsync(
   },
 );
 
+const getStudentProgressSummary = catchAsync(
+  async (req: Request & { user?: any }, res: Response) => {
+    const { studentId: paramsStudentId } = req.params;
+    const studentId = paramsStudentId || req.user.userId;
+    const { unique_user_id } = req.query as { unique_user_id?: string };
+
+    const result = await CourseSetupService.getStudentProgressSummary(
+      studentId,
+      unique_user_id,
+    );
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: 'Student progress summary fetched successfully',
+      data: result,
+    });
+  },
+);
+
 export const CourseSetupController = {
   courseSetup,
   generateQuiz,
@@ -399,4 +422,5 @@ export const CourseSetupController = {
   getStudentPublishedCourses,
   getTeacherPublishedCourses,
   removeTeacherFromCourse,
+  getStudentProgressSummary,
 };
