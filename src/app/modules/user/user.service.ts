@@ -136,6 +136,19 @@ const getAllStudents = async (query: Record<string, any>) => {
   };
 };
 
+const getAllTeachers = async () => {
+  const teachers = await prisma.user.findMany({
+    where: {
+      role: Role.TEACHER,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+
+  return teachers;
+};
+
 const getMyProfile = async (userId: string) => {
   const result = await prisma.user.findUniqueOrThrow({
     where: {
@@ -444,6 +457,7 @@ const getLinkedUsers = async (loggedInUserId: string) => {
 export const UserService = {
   registerStudent,
   getAllStudents,
+  getAllTeachers,
   getStudentById,
   updateProfile,
   deleteStudent,
