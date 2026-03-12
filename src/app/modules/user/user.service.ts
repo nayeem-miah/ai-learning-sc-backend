@@ -146,6 +146,10 @@ const getAllTeachers = async () => {
     },
   });
 
+  if (!teachers) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Teachers not found');
+  }
+
   return teachers;
 };
 
