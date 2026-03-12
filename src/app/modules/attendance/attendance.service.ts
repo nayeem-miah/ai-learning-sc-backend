@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import ApiError from '../../errors/apiError';
-import { prisma } from '../../prisma/prisma';
+import ApiError from "../../errors/apiError";
+import { prisma } from "../../prisma/prisma";
 
 const startClass = async (
   courseId: string,
@@ -16,27 +16,27 @@ const startClass = async (
   if (!aiCourse)
     throw new ApiError(
       404,
-      'Course not found or you are not the assigned teacher',
+      "Course not found or you are not the assigned teacher",
     );
 
   const module = await prisma.courseLectureGenerator.findFirst({
     where: { id: moduleId, uniqueSessionId: aiCourse.uniqueSessionId },
   });
 
-  if (!module) throw new ApiError(404, 'Module not found for this course');
+  if (!module) throw new ApiError(404, "Module not found for this course");
 
   const now = new Date();
-  const dateOnly = new Date(now.toISOString().split('T')[0]);
+  const dateOnly = new Date(now.toISOString().split("T")[0]);
 
   let startTime = now;
   if (aiCourse.startTime) {
     // Attempt to parse "09:00 AM" into today's Date
     try {
-      const [time, modifier] = aiCourse.startTime.split(' ');
+      const [time, modifier] = aiCourse.startTime.split(" ");
       // eslint-disable-next-line prefer-const
-      let [hours, minutes] = time.split(':').map(Number);
-      if (modifier === 'PM' && hours < 12) hours += 12;
-      if (modifier === 'AM' && hours === 12) hours = 0;
+      let [hours, minutes] = time.split(":").map(Number);
+      if (modifier === "PM" && hours < 12) hours += 12;
+      if (modifier === "AM" && hours === 12) hours = 0;
 
       startTime = new Date(dateOnly);
       startTime.setHours(hours, minutes, 0, 0);
@@ -56,7 +56,7 @@ const startClass = async (
   });
 
   if (existingAttendance)
-    throw new ApiError(400, 'Class already started for this lesson today');
+    throw new ApiError(400, "Class already started for this lesson today");
 
   // End time is either parsed from aiCourse or calculated from duration
   let endTime = new Date(
@@ -64,11 +64,11 @@ const startClass = async (
   );
   if (aiCourse.endTime) {
     try {
-      const [time, modifier] = aiCourse.endTime.split(' ');
+      const [time, modifier] = aiCourse.endTime.split(" ");
       // eslint-disable-next-line prefer-const
-      let [hours, minutes] = time.split(':').map(Number);
-      if (modifier === 'PM' && hours < 12) hours += 12;
-      if (modifier === 'AM' && hours === 12) hours = 0;
+      let [hours, minutes] = time.split(":").map(Number);
+      if (modifier === "PM" && hours < 12) hours += 12;
+      if (modifier === "AM" && hours === 12) hours = 0;
 
       endTime = new Date(dateOnly);
       endTime.setHours(hours, minutes, 0, 0);
@@ -99,7 +99,7 @@ const startClass = async (
         data: enrollments.map((enrollment) => ({
           attendanceId: attendance.id,
           studentId: enrollment.studentId,
-          status: 'ABSENT',
+          status: "ABSENT",
         })),
       });
     }
@@ -114,7 +114,7 @@ const joinClass = async (
   studentId: string,
 ) => {
   const now = new Date();
-  const dateOnly = new Date(now.toISOString().split('T')[0]);
+  const dateOnly = new Date(now.toISOString().split("T")[0]);
 
   const attendance = await prisma.attendance.findUnique({
     where: {
@@ -129,7 +129,7 @@ const joinClass = async (
   if (!attendance || !attendance.isActive)
     throw new ApiError(
       404,
-      'No active class session found for this lesson today',
+      "No active class session found for this lesson today",
     );
 
   // Check if student is even enrolled (though attendance record should exist if they were enrolled at start)
@@ -146,22 +146,22 @@ const joinClass = async (
     // Maybe they enrolled after class started?
     throw new ApiError(
       403,
-      'You are not enrolled in this class or record not found',
+      "You are not enrolled in this class or record not found",
     );
   }
 
   // If already marked as PRESENT or LATE, don't update time
-  if (existingRecord.status === 'PRESENT' || existingRecord.status === 'LATE') {
+  if (existingRecord.status === "PRESENT" || existingRecord.status === "LATE") {
     return existingRecord;
   }
 
   const diff = (now.getTime() - attendance.startTime.getTime()) / 60000;
 
-  let status: 'PRESENT' | 'LATE' | 'ABSENT' = 'ABSENT';
+  let status: "PRESENT" | "LATE" | "ABSENT" = "ABSENT";
 
-  if (diff <= 5) status = 'PRESENT';
-  else if (diff <= 15) status = 'LATE';
-  else status = 'LATE';
+  if (diff <= 5) status = "PRESENT";
+  else if (diff <= 15) status = "LATE";
+  else status = "LATE";
 
   return prisma.attendanceRecord.update({
     where: {
@@ -177,7 +177,7 @@ const joinClass = async (
 const updateAttendanceRecord = async (
   attendanceId: string,
   studentId: string,
-  status: 'PRESENT' | 'LATE' | 'ABSENT',
+  status: "PRESENT" | "LATE" | "ABSENT",
 ) => {
   return prisma.attendanceRecord.update({
     where: {
@@ -198,11 +198,11 @@ const getAttendanceSummary = async (attendanceId: string) => {
   });
 
   const present = await prisma.attendanceRecord.count({
-    where: { attendanceId, status: 'PRESENT' },
+    where: { attendanceId, status: "PRESENT" },
   });
 
   const late = await prisma.attendanceRecord.count({
-    where: { attendanceId, status: 'LATE' },
+    where: { attendanceId, status: "LATE" },
   });
 
   return {
@@ -224,7 +224,7 @@ const getStudentAttendance = async (
   };
 
   const attendanceFilter: any = {};
-  if (courseId && courseId !== 'all') {
+  if (courseId && courseId !== "all") {
     attendanceFilter.courseId = courseId;
   }
 
@@ -257,14 +257,14 @@ const getStudentAttendance = async (
     },
     orderBy: {
       attendance: {
-        date: 'asc',
+        date: "asc",
       },
     },
   });
 
-  const present = records.filter((r) => r.status === 'PRESENT').length;
-  const late = records.filter((r) => r.status === 'LATE').length;
-  const absent = records.filter((r) => r.status === 'ABSENT').length;
+  const present = records.filter((r) => r.status === "PRESENT").length;
+  const late = records.filter((r) => r.status === "LATE").length;
+  const absent = records.filter((r) => r.status === "ABSENT").length;
   const total = records.length;
 
   const attendanceRate =
@@ -276,7 +276,7 @@ const getStudentAttendance = async (
     courseName:
       r.attendance.aiCourse?.courseName ||
       r.attendance.aiCourse?.generatedCourseName ||
-      'Unknown Course',
+      "Unknown Course",
   }));
 
   return {
@@ -309,7 +309,7 @@ const getAllAttendanceRecords = async (attendanceId: string) => {
     },
     orderBy: {
       student: {
-        firstName: 'asc',
+        firstName: "asc",
       },
     },
   });
@@ -335,7 +335,7 @@ const getJoinedStudents = async (attendanceId: string) => {
       },
     },
     orderBy: {
-      joinTime: 'desc',
+      joinTime: "desc",
     },
   });
 };
@@ -345,7 +345,7 @@ const markJoinedAsPresent = async (attendanceId: string) => {
     where: { id: attendanceId },
   });
 
-  if (!attendance) throw new ApiError(404, 'Attendance session not found');
+  if (!attendance) throw new ApiError(404, "Attendance session not found");
 
   const joinedRecords = await prisma.attendanceRecord.findMany({
     where: {
@@ -357,15 +357,15 @@ const markJoinedAsPresent = async (attendanceId: string) => {
   });
 
   if (joinedRecords.length === 0)
-    return { message: 'No students have joined yet' };
+    return { message: "No students have joined yet" };
 
   const updates = joinedRecords.map((record) => {
     const diff =
       (record.joinTime!.getTime() - attendance.startTime.getTime()) / 60000;
 
-    let status: 'PRESENT' | 'LATE' = 'PRESENT';
+    let status: "PRESENT" | "LATE" = "PRESENT";
     if (diff > 5) {
-      status = 'LATE';
+      status = "LATE";
     }
 
     return prisma.attendanceRecord.update({
@@ -376,7 +376,7 @@ const markJoinedAsPresent = async (attendanceId: string) => {
 
   await Promise.all(updates);
   return {
-    message: 'Joined students marked correctly based on their join time',
+    message: "Joined students marked correctly based on their join time",
   };
 };
 
@@ -386,7 +386,7 @@ const markAllAsPresent = async (attendanceId: string) => {
       attendanceId,
     },
     data: {
-      status: 'PRESENT',
+      status: "PRESENT",
     },
   });
 };
