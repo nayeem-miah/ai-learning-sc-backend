@@ -18,7 +18,7 @@ router.post(
 router.patch(
   "/update-profile",
   fileUpload.upload.single("file"),
-  auth(Role.STUDENT, Role.ADMIN),
+  auth(Role.STUDENT, Role.ADMIN, Role.TEACHER),
   UserController.updateProfile,
 );
 
@@ -26,20 +26,20 @@ router.post(
   "/linked-users",
   auth(Role.STUDENT, Role.ADMIN),
   // validateRequest(userValidation.createUserLinkSchema),
-  UserController.createUserLink
+  UserController.createUserLink,
 );
 
 router.get(
   "/linked-users",
   auth(Role.STUDENT, Role.ADMIN),
-  UserController.getLinkedUsers
+  UserController.getLinkedUsers,
 );
 
 router.delete(
   "/linked-users/:targetUserId",
   auth(Role.STUDENT, Role.ADMIN),
   // validateRequest(userValidation.removeUserLinkSchema),
-  UserController.removeUserLink
+  UserController.removeUserLink,
 );
 
 // Student CRUD
