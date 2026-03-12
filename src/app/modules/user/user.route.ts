@@ -41,6 +41,12 @@ router.delete(
   UserController.removeUserLink,
 );
 
+router.get(
+  '/student-management',
+  auth(Role.ADMIN, Role.TEACHER),
+  UserController.getStudentManagementData,
+);
+
 // Student CRUD
 router.get('/', auth(), UserController.getAllStudents);
 router.get(

@@ -191,6 +191,26 @@ const getLinkedUsers = catchAsync(async (req: Request & { user?: any }, res: Res
 })
 
 
+const getStudentManagementData = catchAsync(
+  async (req: Request & { user?: any }, res: Response) => {
+    const userId = req.user.userId;
+    const role = req.user.role;
+
+    const result = await UserService.getStudentManagementData(
+      userId,
+      role,
+      req.query,
+    );
+
+    sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: "Student management data fetched successfully",
+      data: result,
+    });
+  },
+);
+
 export const UserController = {
   registerStudent,
   getAllStudents,
@@ -204,4 +224,5 @@ export const UserController = {
   createUserLink,
   removeUserLink,
   getLinkedUsers,
+  getStudentManagementData,
 };

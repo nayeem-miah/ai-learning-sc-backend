@@ -458,6 +458,178 @@ const getLinkedUsers = async (loggedInUserId: string) => {
   };
 };
 
+const getStudentManagementData = async (
+  loggedInUserId: string,
+  role: Role,
+  query: {
+    searchTerm?: string;
+    classId?: string;
+    courseId?: string;
+    page?: string;
+    limit?: string;
+  },
+) => {
+  const page = Number(query.page) || 1;
+  const limit = Number(query.limit) || 10;
+  const skip = (page - 1) * limit;
+
+  // 1. Build the filter for students
+  const whereCondition: any = {
+    role: Role.STUDENT,
+  };
+
+  if (query.searchTerm) {
+    whereCondition.OR = [
+      { firstName: { contains: query.searchTerm, mode: 'insensitive' } },
+      { lastName: { contains: query.searchTerm, mode: 'insensitive' } },
+      { email: { contains: query.searchTerm, mode: 'insensitive' } },
+    ];
+  }
+
+  // Teacher can only see students in their courses
+  if (role === Role.TEACHER) {
+    whereCondition.enrollments = {
+      some: {
+        aiCourse: {
+          teacherId: loggedInUserId,
+        },
+      },
+    };
+  }
+
+  // Filter by Course
+  if (query.courseId) {
+    whereCondition.enrollments = {
+      some: {
+        aiCourseId: query.courseId,
+      },
+    };
+  }
+
+  // Filter by Class
+  if (query.classId) {
+    whereCondition.studentClasses = {
+      some: {
+        classId: query.classId,
+      },
+    };
+  }
+
+  // 2. Fetch Students with necessary relations
+  const [students, totalStudents] = await Promise.all([
+    prisma.user.findMany({
+      where: whereCondition,
+      include: {
+        studentProfile: true,
+        studentClasses: {
+          include: {
+            class: true,
+          },
+        },
+        enrollments: {
+          select: {
+            progressPercentage: true,
+            aiCourseId: true,
+          },
+        },
+        attendanceRecords: {
+          select: {
+            status: true,
+          },
+        },
+      },
+      skip,
+      take: limit,
+      orderBy: {
+        createdAt: 'desc',
+      },
+    }),
+    prisma.user.count({ where: whereCondition }),
+  ]);
+
+  // 3. Calculate Summary Stats for the ENTIRE filtered set (not just current page)
+  // To be accurate, we need to fetch all filtered student IDs for the header stats
+  const allFilteredStudents = await prisma.user.findMany({
+    where: whereCondition,
+    select: {
+      id: true,
+      enrollments: {
+        select: {
+          progressPercentage: true,
+        },
+      },
+      attendanceRecords: {
+        select: {
+          status: true,
+        },
+      },
+    },
+  });
+
+  let engagedCount = 0;
+  let noActivityCount = 0;
+  let totalPresentLate = 0;
+  let totalAttendanceRecords = 0;
+
+  allFilteredStudents.forEach((student) => {
+    const hasActivity = student.enrollments.some((e) => e.progressPercentage > 0);
+    if (hasActivity) {
+      engagedCount++;
+    } else {
+      noActivityCount++;
+    }
+
+    student.attendanceRecords.forEach((ar) => {
+      totalAttendanceRecords++;
+      if (ar.status === 'PRESENT' || ar.status === 'LATE') {
+        totalPresentLate++;
+      }
+    });
+  });
+
+  const overallAttendanceRate =
+    totalAttendanceRecords > 0
+      ? Math.round((totalPresentLate / totalAttendanceRecords) * 100)
+      : 0;
+
+  // 4. Map the paginated list for the UI
+  const mappedStudents = students.map((s) => {
+    const enrollments = s.enrollments || [];
+    const avgMastery =
+      enrollments.length > 0
+        ? Math.round(
+            enrollments.reduce((sum, e) => sum + e.progressPercentage, 0) /
+              enrollments.length,
+          )
+        : 0;
+
+    return {
+      id: s.id,
+      name: `${s.firstName} ${s.lastName}`,
+      studentId: s.id.slice(-6).toUpperCase(), // Short visual ID
+      class: s.studentClasses[0]?.class?.gradeLevel || 'N/A',
+      mastery: avgMastery,
+      profilePicture: s.profilePicture,
+    };
+  });
+
+  return {
+    summary: {
+      totalStudents,
+      engaged: engagedCount,
+      noActivity: noActivityCount,
+      attendanceRate: overallAttendanceRate,
+    },
+    students: mappedStudents,
+    meta: {
+      page,
+      limit,
+      total: totalStudents,
+      totalPage: Math.ceil(totalStudents / limit),
+    },
+  };
+};
+
 export const UserService = {
   registerStudent,
   getAllStudents,
@@ -471,4 +643,5 @@ export const UserService = {
   createUserLink,
   removeUserLink,
   getLinkedUsers,
+  getStudentManagementData,
 };
