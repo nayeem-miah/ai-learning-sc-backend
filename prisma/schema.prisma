@@ -237,6 +237,7 @@ model Attendance {
   id         String   @id @default(auto()) @map("_id") @db.ObjectId
   courseId   String?  @db.ObjectId
   aiCourseId String?  @db.ObjectId
+  moduleId   String?  @db.ObjectId
   date       DateTime
   startTime  DateTime
   endTime    DateTime
@@ -244,10 +245,11 @@ model Attendance {
 
   createdAt DateTime @default(now())
 
-  aiCourse CourseNameGenerator? @relation(fields: [aiCourseId], references: [id], onDelete: Cascade)
+  aiCourse CourseNameGenerator?    @relation(fields: [aiCourseId], references: [id], onDelete: Cascade)
+  module   CourseLectureGenerator? @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   records  AttendanceRecord[]
 
-  @@unique([courseId, date])
+  @@unique([courseId, moduleId, date])
 }
 
 model AttendanceRecord {
@@ -349,6 +351,7 @@ model CourseLectureGenerator {
   course           CourseNameGenerator @relation(fields: [uniqueSessionId], references: [uniqueSessionId], onDelete: Cascade)
   quizQuestions    QuizQuestion[]
   lessonProgresses LessonProgress[]
+  attendances      Attendance[]
 
   // Prevent duplicate module numbers per session
   @@unique([uniqueSessionId, moduleNumber])
