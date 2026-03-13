@@ -630,6 +630,190 @@ const getStudentManagementData = async (
   };
 };
 
+const getSingleStudentManagementDetail = async (
+  studentId: string,
+  loggedInUserId: string,
+  role: Role,
+) => {
+  // Filter enrollments and attendance if teacher
+  const enrollmentWhere: any = {};
+  const attendanceWhere: any = {};
+  if (role === Role.TEACHER) {
+    enrollmentWhere.aiCourse = {
+      teacherId: loggedInUserId,
+    };
+    attendanceWhere.attendance = {
+      aiCourse: {
+        teacherId: loggedInUserId,
+      },
+    };
+  }
+
+  const student = await prisma.user.findUnique({
+    where: { id: studentId, role: Role.STUDENT },
+    include: {
+      studentProfile: true,
+      studentClasses: { include: { class: true } },
+      enrollments: {
+        where: enrollmentWhere,
+        include: {
+          aiCourse: {
+            include: {
+              modules: {
+                orderBy: { moduleNumber: 'asc' },
+                include: {
+                  lessonProgresses: { where: { studentId } },
+                  quizQuestions: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      attendanceRecords: {
+        where: attendanceWhere,
+      },
+    },
+  });
+
+  if (!student) {
+    throw new ApiError(404, 'Student not found');
+  }
+
+  const aiUserId = student.studentProfile?.aiUserId;
+  const enrolledCoursesCount = student.enrollments.length;
+
+  // Calculate Attendance Rate
+  const totalAttendance = student.attendanceRecords.length;
+  const presentLate = student.attendanceRecords.filter(
+    (ar) => ar.status === 'PRESENT' || ar.status === 'LATE',
+  ).length;
+  const attendanceRate =
+    totalAttendance > 0 ? Math.round((presentLate / totalAttendance) * 100) : 0;
+
+  let totalCourseProgress = 0;
+  let totalCourseMastery = 0;
+  let coursesWithMasteryCount = 0;
+
+  const courses = await Promise.all(
+    student.enrollments.map(async (enrollment) => {
+      const course = enrollment.aiCourse;
+      if (!course) return null;
+
+      // Progress
+      const totalModulesCount = course.totalModules;
+      const completedModulesCount = course.modules.filter(
+        (m) =>
+          m.lessonProgresses.length > 0 && m.lessonProgresses[0].isCompleted,
+      ).length;
+      const progressPercentage =
+        totalModulesCount > 0
+          ? Math.round((completedModulesCount / totalModulesCount) * 100)
+          : 0;
+      totalCourseProgress += progressPercentage;
+
+      // Mastery & Modules detail
+      let courseTotalMasteryScore = 0;
+      let courseModWithQuizCount = 0;
+      let totalLessonsInCourse = 0;
+      let completedLessonsInCourse = 0;
+
+      const modules = await Promise.all(
+        course.modules.map(async (mod) => {
+          const isCompleted =
+            mod.lessonProgresses.length > 0 &&
+            mod.lessonProgresses[0].isCompleted;
+
+          const lessons = (mod.studyTopics as any[]) || [];
+          totalLessonsInCourse += lessons.length;
+          if (isCompleted) {
+            completedLessonsInCourse += lessons.length;
+          }
+
+          let quizScore = null;
+          if (aiUserId) {
+            const questionIds = mod.quizQuestions.map((q) => q.questionId);
+            if (questionIds.length > 0) {
+              const answers = await prisma.quizAnswer.findMany({
+                where: {
+                  uniqueUserId: aiUserId,
+                  uniqueSessionId: course.uniqueSessionId,
+                  questionId: { in: questionIds },
+                },
+              });
+
+              if (answers.length > 0) {
+                const correct = answers.filter((a) => a.isCorrect).length;
+                quizScore = Math.round((correct / answers.length) * 100);
+                courseTotalMasteryScore += quizScore;
+                courseModWithQuizCount++;
+              }
+            }
+          }
+
+          return {
+            id: mod.id,
+            moduleNumber: mod.moduleNumber,
+            moduleTitle: mod.moduleTitle,
+            isCompleted,
+            quizScore,
+            totalLessons: lessons.length,
+          };
+        }),
+      );
+
+      const courseAvgMastery =
+        courseModWithQuizCount > 0
+          ? Math.round(courseTotalMasteryScore / courseModWithQuizCount)
+          : 0;
+
+      if (courseModWithQuizCount > 0) {
+        totalCourseMastery += courseAvgMastery;
+        coursesWithMasteryCount++;
+      }
+
+      return {
+        id: course.id,
+        courseName: course.courseName,
+        progress: progressPercentage,
+        mastery: courseAvgMastery,
+        modulesCompleted: completedModulesCount,
+        modulesTotal: totalModulesCount,
+        lessonsCompleted: completedLessonsInCourse,
+        lessonsTotal: totalLessonsInCourse,
+        modules,
+      };
+    }),
+  );
+
+  const avgProgress =
+    enrolledCoursesCount > 0
+      ? Math.round(totalCourseProgress / enrolledCoursesCount)
+      : 0;
+  const avgMastery =
+    coursesWithMasteryCount > 0
+      ? Math.round(totalCourseMastery / coursesWithMasteryCount)
+      : 0;
+
+  return {
+    studentInfo: {
+      id: student.id,
+      name: `${student.firstName} ${student.lastName}`,
+      studentId: student.id.slice(-6).toUpperCase(),
+      grade: student.studentClasses[0]?.class?.gradeLevel || 'N/A',
+      profilePicture: student.profilePicture,
+    },
+    summaryStats: {
+      enrolledCourses: enrolledCoursesCount,
+      avgProgress,
+      avgMastery,
+      attendanceRate,
+    },
+    enrolledCourses: courses.filter((c) => c !== null),
+  };
+};
+
+
 export const UserService = {
   registerStudent,
   getAllStudents,
@@ -644,4 +828,6 @@ export const UserService = {
   removeUserLink,
   getLinkedUsers,
   getStudentManagementData,
+  getSingleStudentManagementDetail,
 };
+

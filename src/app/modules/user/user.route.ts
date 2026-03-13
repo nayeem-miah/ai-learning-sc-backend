@@ -47,6 +47,13 @@ router.get(
   UserController.getStudentManagementData,
 );
 
+router.get(
+  '/student-management/:id',
+  auth(Role.ADMIN, Role.TEACHER),
+  UserController.getSingleStudentManagementDetail,
+);
+
+
 // Student CRUD
 router.get('/', auth(), UserController.getAllStudents);
 router.get(

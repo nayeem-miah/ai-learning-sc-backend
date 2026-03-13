@@ -205,11 +205,33 @@ const getStudentManagementData = catchAsync(
     sendResponse(res, {
       statusCode: 200,
       success: true,
-      message: "Student management data fetched successfully",
+      message: 'Student management data fetched successfully',
       data: result,
     });
   },
 );
+
+const getSingleStudentManagementDetail = catchAsync(
+  async (req: Request & { user?: any }, res: Response) => {
+    const { id } = req.params;
+    const { userId, role } = req.user;
+
+    const result = await UserService.getSingleStudentManagementDetail(
+      id,
+      userId,
+      role,
+    );
+
+    sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: 'Single student management detail fetched successfully',
+      data: result,
+    });
+  },
+);
+
+
 
 export const UserController = {
   registerStudent,
@@ -225,4 +247,6 @@ export const UserController = {
   removeUserLink,
   getLinkedUsers,
   getStudentManagementData,
+  getSingleStudentManagementDetail,
 };
+
