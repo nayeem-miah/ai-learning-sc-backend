@@ -698,6 +698,7 @@ const getCourseBySession = async (uniqueSessionId: string) => {
               correctAnswer: true,
             },
           },
+          lessonProgresses: true,
         },
       },
       quizzes: {
@@ -711,7 +712,19 @@ const getCourseBySession = async (uniqueSessionId: string) => {
     throw new ApiError(404, `Course not found for session: ${uniqueSessionId}`);
   }
 
-  return course;
+  const mappedModules = course.modules.map((mod) => ({
+    ...mod,
+    isCompleted: false,
+    quizScore: null,
+  }));
+
+  const { quizzes, ...courseData } = course;
+
+  return {
+    ...courseData,
+    quizQuestions: quizzes,
+    modules: mappedModules,
+  };
 };
 
 const submitModuleQuiz = async (
@@ -1038,6 +1051,7 @@ const getCourseById = async (id: string) => {
           quizQuestions: {
             orderBy: { questionNumber: 'asc' },
           },
+          lessonProgresses: true,
         },
       },
       quizzes: {
@@ -1046,13 +1060,34 @@ const getCourseById = async (id: string) => {
     },
   });
 
-
   if (!course) {
     throw new ApiError(404, 'Course not found');
   }
 
-  return course;
+  const { quizzes, ...courseData } = course;
+
+  const mappedModules = course.modules.map((mod) => {
+    // If module-level quizQuestions is empty, try to filter from top-level quizzes
+    let moduleQuizzes = mod.quizQuestions;
+    if (moduleQuizzes.length === 0 && quizzes.length > 0) {
+      moduleQuizzes = quizzes.filter(
+        (q: any) =>
+          q.moduleId === mod.id ||
+          q.questionId.includes(`_MOD${mod.moduleNumber}_`),
+      );
+    }
+
+    return {
+      ...mod,
+      quizQuestions: moduleQuizzes,
+      isCompleted: false,
+      quizScore: null,
+    };
+  });
+
+  return { ...courseData, modules: mappedModules };
 };
+
 
 const updateCourse = async (id: string, payload: any) => {
   const isExist = await prisma.courseNameGenerator.findUnique({
@@ -1190,9 +1225,13 @@ const getStudentPublishedCourses = async (studentId: string) => {
           },
         },
       },
+      quizzes: {
+        orderBy: { questionNumber: 'asc' },
+      },
       class: true,
     },
   });
+
 
   const result = await Promise.all(
     courses.map(async (course) => {
@@ -1211,15 +1250,28 @@ const getStudentPublishedCourses = async (studentId: string) => {
       let modulesWithQuizzesCount = 0;
       let totalMasteryScore = 0;
 
+      const { quizzes, ...courseData } = course;
+
       const mappedModules = await Promise.all(
         course.modules.map(async (mod) => {
           const isCompleted =
             mod.lessonProgresses.length > 0 &&
             mod.lessonProgresses[0].isCompleted;
 
+          // If module-level quizQuestions is empty, try to filter from top-level quizzes
+          let moduleQuizzes = mod.quizQuestions;
+          if (moduleQuizzes.length === 0 && quizzes.length > 0) {
+            moduleQuizzes = quizzes.filter(
+              (q: any) =>
+                q.moduleId === mod.id ||
+                q.questionId.includes(`_MOD${mod.moduleNumber}_`),
+            );
+          }
+
           let quizScore = null;
           if (aiUserId) {
-            const questionIds = mod.quizQuestions.map((q) => q.questionId);
+            // Use moduleQuizzes for score calculation as it's more reliable
+            const questionIds = moduleQuizzes.map((q: any) => q.questionId);
             if (questionIds.length > 0) {
               const answers = await prisma.quizAnswer.findMany({
                 where: {
@@ -1240,6 +1292,7 @@ const getStudentPublishedCourses = async (studentId: string) => {
 
           return {
             ...mod,
+            quizQuestions: moduleQuizzes,
             isCompleted,
             quizScore,
           };
@@ -1253,7 +1306,7 @@ const getStudentPublishedCourses = async (studentId: string) => {
       }
 
       return {
-        ...course,
+        ...courseData,
         modules: mappedModules,
         overallProgress: progressPercentage,
         overallMastery,
@@ -1261,13 +1314,15 @@ const getStudentPublishedCourses = async (studentId: string) => {
     }),
   );
 
+
+
   return result;
 };
 
 
 
 const getTeacherPublishedCourses = async (teacherId: string) => {
-  return await prisma.courseNameGenerator.findMany({
+  const courses = await prisma.courseNameGenerator.findMany({
     where: {
       isPublished: true,
       teacherId,
@@ -1276,15 +1331,29 @@ const getTeacherPublishedCourses = async (teacherId: string) => {
       modules: {
         orderBy: { moduleNumber: 'asc' },
         include: {
+          lessonProgresses: true,
           quizQuestions: {
             orderBy: { questionNumber: 'asc' },
           },
         },
       },
+      quizzes: {
+        orderBy: { questionNumber: 'asc' },
+      },
       class: true,
     },
   });
+
+  return courses.map((course) => {
+    const { quizzes, ...courseData } = course;
+    return {
+      ...courseData,
+      quizQuestions: quizzes,
+    };
+  });
 };
+
+
 
 const removeTeacherFromCourse = async (courseId: string) => {
   const isExist = await prisma.courseNameGenerator.findUnique({
@@ -1426,9 +1495,13 @@ const getStudentCourseDetails = async (studentId: string, courseId: string) => {
           },
         },
       },
+      quizzes: {
+        orderBy: { questionNumber: 'asc' },
+      },
       class: true,
     },
   });
+
 
   if (!course) {
     throw new ApiError(404, 'Course not found');
@@ -1505,8 +1578,11 @@ const getStudentCourseDetails = async (studentId: string, courseId: string) => {
   // Find next module/lesson
   const nextModule = mappedModules.find((m) => !m.isCompleted);
 
+  const { quizzes, ...courseData } = course;
+
   return {
-    ...course,
+    ...courseData,
+    quizQuestions: quizzes,
     modules: mappedModules,
     overallProgress: progressPercentage,
     overallMastery,
@@ -1523,10 +1599,10 @@ const getStudentCourseDetails = async (studentId: string, courseId: string) => {
     },
     nextModule: nextModule
       ? {
-          id: nextModule.id,
-          title: nextModule.moduleTitle,
-          moduleNumber: nextModule.moduleNumber,
-        }
+        id: nextModule.id,
+        title: nextModule.moduleTitle,
+        moduleNumber: nextModule.moduleNumber,
+      }
       : null,
   };
 };
@@ -1543,6 +1619,9 @@ const getTeacherCourseDetails = async (teacherId: string, courseId: string) => {
           },
         },
       },
+      quizzes: {
+        orderBy: { questionNumber: 'asc' },
+      },
       class: true,
       enrollments: {
         select: {
@@ -1551,6 +1630,7 @@ const getTeacherCourseDetails = async (teacherId: string, courseId: string) => {
       },
     },
   });
+
 
   if (!course) {
     throw new ApiError(404, 'Course not found');
@@ -1572,7 +1652,7 @@ const getTeacherCourseDetails = async (teacherId: string, courseId: string) => {
   if (totalStudents > 0) {
     // Progress is based on LessonProgress count vs total modules
     const totalModules = course.totalModules;
-    
+
     for (const studentId of enrolledStudentIds) {
       const completedModules = await prisma.lessonProgress.count({
         where: {
@@ -1581,7 +1661,7 @@ const getTeacherCourseDetails = async (teacherId: string, courseId: string) => {
           isCompleted: true,
         },
       });
-      
+
       const studentProgress = totalModules > 0 ? (completedModules / totalModules) * 100 : 0;
       totalProgress += studentProgress;
 
@@ -1637,8 +1717,11 @@ const getTeacherCourseDetails = async (teacherId: string, courseId: string) => {
     }
   });
 
+  const { quizzes, ...courseData } = course;
+
   return {
-    ...course,
+    ...courseData,
+    quizQuestions: quizzes,
     overallProgress: averageProgress,
     overallMastery: averageMastery,
     stats: {
