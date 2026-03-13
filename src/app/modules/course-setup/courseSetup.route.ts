@@ -44,6 +44,13 @@ router.get(
   CourseSetupController.getTeacherPublishedCourses,
 );
 
+router.get(
+  '/teacher/course-details/:id',
+  auth(Role.TEACHER),
+  CourseSetupController.getTeacherCourseDetails,
+);
+
+
 router.get('/:id', CourseSetupController.getCourseById);
 
 router.get('/:session_id', CourseSetupController.getCourseBySession);

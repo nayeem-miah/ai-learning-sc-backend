@@ -1519,6 +1519,128 @@ const getStudentCourseDetails = async (studentId: string, courseId: string) => {
   };
 };
 
+const getTeacherCourseDetails = async (teacherId: string, courseId: string) => {
+  const course = await prisma.courseNameGenerator.findUnique({
+    where: { id: courseId },
+    include: {
+      modules: {
+        orderBy: { moduleNumber: 'asc' },
+        include: {
+          quizQuestions: {
+            orderBy: { questionNumber: 'asc' },
+          },
+        },
+      },
+      class: true,
+      enrollments: {
+        select: {
+          studentId: true,
+        },
+      },
+    },
+  });
+
+  if (!course) {
+    throw new ApiError(404, 'Course not found');
+  }
+
+  // Ensure this course belongs to the teacher
+  if (course.teacherId !== teacherId) {
+    throw new ApiError(403, 'You do not have permission to view this course');
+  }
+
+  const enrolledStudentIds = course.enrollments.map((e) => e.studentId);
+  const totalStudents = enrolledStudentIds.length;
+
+  // Calculate global average progress and mastery for this course
+  let totalProgress = 0;
+  let totalMastery = 0;
+  let studentsWithMastery = 0;
+
+  if (totalStudents > 0) {
+    // Progress is based on LessonProgress count vs total modules
+    const totalModules = course.totalModules;
+    
+    for (const studentId of enrolledStudentIds) {
+      const completedModules = await prisma.lessonProgress.count({
+        where: {
+          studentId,
+          lessonId: { in: course.modules.map((m) => m.id) },
+          isCompleted: true,
+        },
+      });
+      
+      const studentProgress = totalModules > 0 ? (completedModules / totalModules) * 100 : 0;
+      totalProgress += studentProgress;
+
+      // Mastery is based on QuizAnswer scores
+      const profile = await prisma.studentProfile.findUnique({
+        where: { userId: studentId },
+        select: { aiUserId: true }
+      });
+      const aiUserId = (profile as any)?.aiUserId;
+
+      if (aiUserId) {
+        let studentTotalScore = 0;
+        let modWithQuizCount = 0;
+
+        for (const mod of course.modules) {
+          const questionIds = mod.quizQuestions.map(q => q.questionId);
+          if (questionIds.length > 0) {
+            const answers = await prisma.quizAnswer.findMany({
+              where: {
+                uniqueUserId: aiUserId,
+                uniqueSessionId: course.uniqueSessionId,
+                questionId: { in: questionIds }
+              }
+            });
+
+            if (answers.length > 0) {
+              const correct = answers.filter(a => a.isCorrect).length;
+              studentTotalScore += (correct / answers.length) * 100;
+              modWithQuizCount++;
+            }
+          }
+        }
+
+        if (modWithQuizCount > 0) {
+          totalMastery += (studentTotalScore / modWithQuizCount);
+          studentsWithMastery++;
+        }
+      }
+    }
+  }
+
+  const averageProgress = totalStudents > 0 ? Math.round(totalProgress / totalStudents) : 0;
+  const averageMastery = studentsWithMastery > 0 ? Math.round(totalMastery / studentsWithMastery) : 0;
+
+  // Course structure stats
+  let totalLessonsCount = 0;
+  let totalAssessmentsCount = 0;
+
+  course.modules.forEach((mod) => {
+    totalLessonsCount += ((mod.studyTopics as any[]) || []).length;
+    if (mod.quizQuestions.length > 0) {
+      totalAssessmentsCount++;
+    }
+  });
+
+  return {
+    ...course,
+    overallProgress: averageProgress,
+    overallMastery: averageMastery,
+    stats: {
+      masteryRequirement: course.masteryRequirement,
+      averageMastery: averageMastery,
+      totalStudents: totalStudents,
+      modulesTotal: course.totalModules,
+      lessonsTotal: totalLessonsCount,
+      assessmentsTotal: totalAssessmentsCount,
+      courseLength: course.courseLength,
+    },
+  };
+};
+
 export const CourseSetupService = {
   courseSetup,
   generateQuiz,
@@ -1541,7 +1663,9 @@ export const CourseSetupService = {
   getStudentProgressSummary,
   completeLesson,
   getStudentCourseDetails,
+  getTeacherCourseDetails,
 };
+
 
 
 

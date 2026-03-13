@@ -445,6 +445,23 @@ const getStudentCourseDetails = catchAsync(
   },
 );
 
+const getTeacherCourseDetails = catchAsync(
+  async (req: Request & { user?: any }, res: Response) => {
+    const { id } = req.params;
+    const teacherId = req.user.userId;
+    const result = await CourseSetupService.getTeacherCourseDetails(
+      teacherId,
+      id,
+    );
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: 'Teacher course details fetched successfully',
+      data: result,
+    });
+  },
+);
+
 export const CourseSetupController = {
 
   courseSetup,
@@ -468,6 +485,5 @@ export const CourseSetupController = {
   getStudentProgressSummary,
   completeLesson,
   getStudentCourseDetails,
+  getTeacherCourseDetails,
 };
-
-
