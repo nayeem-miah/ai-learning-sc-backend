@@ -818,6 +818,26 @@ const submitModuleQuiz = async (
   const scorePercentage =
     totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
 
+  // 7. Mark as completed
+  await prisma.lessonProgress.upsert({
+    where: {
+      studentId_lessonId: {
+        studentId,
+        lessonId: body.module_id,
+      },
+    },
+    update: {
+      isCompleted: true,
+      completedAt: new Date(),
+    },
+    create: {
+      studentId,
+      lessonId: body.module_id,
+      isCompleted: true,
+      completedAt: new Date(),
+    },
+  });
+
   return {
     success: true,
     unique_user_id: body.unique_user_id,
@@ -832,6 +852,28 @@ const submitModuleQuiz = async (
     details: submissionResults,
   };
 };
+
+const completeLesson = async (studentId: string, lessonId: string) => {
+  return await prisma.lessonProgress.upsert({
+    where: {
+      studentId_lessonId: {
+        studentId,
+        lessonId,
+      },
+    },
+    update: {
+      isCompleted: true,
+      completedAt: new Date(),
+    },
+    create: {
+      studentId,
+      lessonId,
+      isCompleted: true,
+      completedAt: new Date(),
+    },
+  });
+};
+
 
 const getModuleQuizResult = async (query: {
   unique_user_id: string;
@@ -1110,7 +1152,12 @@ const deleteCourse = async (id: string) => {
 };
 
 const getStudentPublishedCourses = async (studentId: string) => {
-  return await prisma.courseNameGenerator.findMany({
+  const profile = await prisma.studentProfile.findUnique({
+    where: { userId: studentId },
+  });
+  const aiUserId = (profile as any)?.aiUserId;
+
+  const courses = await prisma.courseNameGenerator.findMany({
     where: {
       isPublished: true,
       enrollments: {
@@ -1123,6 +1170,9 @@ const getStudentPublishedCourses = async (studentId: string) => {
       modules: {
         orderBy: { moduleNumber: 'asc' },
         include: {
+          lessonProgresses: {
+            where: { studentId },
+          },
           quizQuestions: {
             orderBy: { questionNumber: 'asc' },
           },
@@ -1131,7 +1181,78 @@ const getStudentPublishedCourses = async (studentId: string) => {
       class: true,
     },
   });
+
+  const result = await Promise.all(
+    courses.map(async (course) => {
+      const totalModules = course.totalModules;
+      const completedModules = course.modules.filter(
+        (m) =>
+          m.lessonProgresses.length > 0 && m.lessonProgresses[0].isCompleted,
+      ).length;
+
+      const progressPercentage =
+        totalModules > 0
+          ? Math.round((completedModules / totalModules) * 100)
+          : 0;
+
+      let overallMastery = 0;
+      let modulesWithQuizzesCount = 0;
+      let totalMasteryScore = 0;
+
+      const mappedModules = await Promise.all(
+        course.modules.map(async (mod) => {
+          const isCompleted =
+            mod.lessonProgresses.length > 0 &&
+            mod.lessonProgresses[0].isCompleted;
+
+          let quizScore = null;
+          if (aiUserId) {
+            const questionIds = mod.quizQuestions.map((q) => q.questionId);
+            if (questionIds.length > 0) {
+              const answers = await prisma.quizAnswer.findMany({
+                where: {
+                  uniqueUserId: aiUserId,
+                  uniqueSessionId: course.uniqueSessionId,
+                  questionId: { in: questionIds },
+                },
+              });
+
+              if (answers.length > 0) {
+                const correct = answers.filter((a) => a.isCorrect).length;
+                quizScore = Math.round((correct / answers.length) * 100);
+                totalMasteryScore += quizScore;
+                modulesWithQuizzesCount++;
+              }
+            }
+          }
+
+          return {
+            ...mod,
+            isCompleted,
+            quizScore,
+          };
+        }),
+      );
+
+      if (modulesWithQuizzesCount > 0) {
+        overallMastery = Math.round(
+          totalMasteryScore / modulesWithQuizzesCount,
+        );
+      }
+
+      return {
+        ...course,
+        modules: mappedModules,
+        overallProgress: progressPercentage,
+        overallMastery,
+      };
+    }),
+  );
+
+  return result;
 };
+
+
 
 const getTeacherPublishedCourses = async (teacherId: string) => {
   return await prisma.courseNameGenerator.findMany({
@@ -1273,6 +1394,253 @@ const getStudentProgressSummary = async (
   return summary.filter((s) => s !== null);
 };
 
+const getStudentCourseDetails = async (studentId: string, courseId: string) => {
+  const profile = await prisma.studentProfile.findUnique({
+    where: { userId: studentId },
+  });
+  const aiUserId = (profile as any)?.aiUserId;
+
+  const course = await prisma.courseNameGenerator.findUnique({
+    where: { id: courseId },
+    include: {
+      modules: {
+        orderBy: { moduleNumber: 'asc' },
+        include: {
+          lessonProgresses: {
+            where: { studentId },
+          },
+          quizQuestions: {
+            orderBy: { questionNumber: 'asc' },
+          },
+        },
+      },
+      class: true,
+    },
+  });
+
+  if (!course) {
+    throw new ApiError(404, 'Course not found');
+  }
+
+  const totalModulesCount = course.totalModules;
+  const completedModulesCount = course.modules.filter(
+    (m) => m.lessonProgresses.length > 0 && m.lessonProgresses[0].isCompleted,
+  ).length;
+
+  const progressPercentage =
+    totalModulesCount > 0
+      ? Math.round((completedModulesCount / totalModulesCount) * 100)
+      : 0;
+
+  let totalMasteryScore = 0;
+  let modulesWithQuizzesCount = 0;
+  let totalLessonsCount = 0;
+  let completedLessonsCount = 0;
+  let totalAssessmentsCount = 0;
+  let completedAssessmentsCount = 0;
+
+  const mappedModules = await Promise.all(
+    course.modules.map(async (mod) => {
+      const isCompleted =
+        mod.lessonProgresses.length > 0 && mod.lessonProgresses[0].isCompleted;
+
+      // Lessons count from studyTopics
+      const lessons = (mod.studyTopics as any[]) || [];
+      totalLessonsCount += lessons.length;
+      if (isCompleted) {
+        completedLessonsCount += lessons.length;
+      }
+
+      // Assessments (Quizzes) - Treat each module's quiz set as one assessment
+      const hasQuiz = mod.quizQuestions.length > 0;
+      if (hasQuiz) {
+        totalAssessmentsCount++;
+      }
+
+      let quizScore = null;
+      if (aiUserId && hasQuiz) {
+        const questionIds = mod.quizQuestions.map((q) => q.questionId);
+        const answers = await prisma.quizAnswer.findMany({
+          where: {
+            uniqueUserId: aiUserId,
+            uniqueSessionId: course.uniqueSessionId,
+            questionId: { in: questionIds },
+          },
+        });
+
+        if (answers.length > 0) {
+          const correct = answers.filter((a) => a.isCorrect).length;
+          quizScore = Math.round((correct / answers.length) * 100);
+          totalMasteryScore += quizScore;
+          modulesWithQuizzesCount++;
+          completedAssessmentsCount++;
+        }
+      }
+
+      return {
+        ...mod,
+        isCompleted,
+        quizScore,
+      };
+    }),
+  );
+
+  const overallMastery =
+    modulesWithQuizzesCount > 0
+      ? Math.round(totalMasteryScore / modulesWithQuizzesCount)
+      : 0;
+
+  // Find next module/lesson
+  const nextModule = mappedModules.find((m) => !m.isCompleted);
+
+  return {
+    ...course,
+    modules: mappedModules,
+    overallProgress: progressPercentage,
+    overallMastery,
+    stats: {
+      masteryRequirement: course.masteryRequirement,
+      averageMastery: overallMastery,
+      modulesTotal: totalModulesCount,
+      modulesCompleted: completedModulesCount,
+      lessonsTotal: totalLessonsCount,
+      lessonsCompleted: completedLessonsCount,
+      assessmentsTotal: totalAssessmentsCount,
+      assessmentsCompleted: completedAssessmentsCount,
+      courseLength: course.courseLength,
+    },
+    nextModule: nextModule
+      ? {
+          id: nextModule.id,
+          title: nextModule.moduleTitle,
+          moduleNumber: nextModule.moduleNumber,
+        }
+      : null,
+  };
+};
+
+const getTeacherCourseDetails = async (teacherId: string, courseId: string) => {
+  const course = await prisma.courseNameGenerator.findUnique({
+    where: { id: courseId },
+    include: {
+      modules: {
+        orderBy: { moduleNumber: 'asc' },
+        include: {
+          quizQuestions: {
+            orderBy: { questionNumber: 'asc' },
+          },
+        },
+      },
+      class: true,
+      enrollments: {
+        select: {
+          studentId: true,
+        },
+      },
+    },
+  });
+
+  if (!course) {
+    throw new ApiError(404, 'Course not found');
+  }
+
+  // Ensure this course belongs to the teacher
+  if (course.teacherId !== teacherId) {
+    throw new ApiError(403, 'You do not have permission to view this course');
+  }
+
+  const enrolledStudentIds = course.enrollments.map((e) => e.studentId);
+  const totalStudents = enrolledStudentIds.length;
+
+  // Calculate global average progress and mastery for this course
+  let totalProgress = 0;
+  let totalMastery = 0;
+  let studentsWithMastery = 0;
+
+  if (totalStudents > 0) {
+    // Progress is based on LessonProgress count vs total modules
+    const totalModules = course.totalModules;
+    
+    for (const studentId of enrolledStudentIds) {
+      const completedModules = await prisma.lessonProgress.count({
+        where: {
+          studentId,
+          lessonId: { in: course.modules.map((m) => m.id) },
+          isCompleted: true,
+        },
+      });
+      
+      const studentProgress = totalModules > 0 ? (completedModules / totalModules) * 100 : 0;
+      totalProgress += studentProgress;
+
+      // Mastery is based on QuizAnswer scores
+      const profile = await prisma.studentProfile.findUnique({
+        where: { userId: studentId },
+        select: { aiUserId: true }
+      });
+      const aiUserId = (profile as any)?.aiUserId;
+
+      if (aiUserId) {
+        let studentTotalScore = 0;
+        let modWithQuizCount = 0;
+
+        for (const mod of course.modules) {
+          const questionIds = mod.quizQuestions.map(q => q.questionId);
+          if (questionIds.length > 0) {
+            const answers = await prisma.quizAnswer.findMany({
+              where: {
+                uniqueUserId: aiUserId,
+                uniqueSessionId: course.uniqueSessionId,
+                questionId: { in: questionIds }
+              }
+            });
+
+            if (answers.length > 0) {
+              const correct = answers.filter(a => a.isCorrect).length;
+              studentTotalScore += (correct / answers.length) * 100;
+              modWithQuizCount++;
+            }
+          }
+        }
+
+        if (modWithQuizCount > 0) {
+          totalMastery += (studentTotalScore / modWithQuizCount);
+          studentsWithMastery++;
+        }
+      }
+    }
+  }
+
+  const averageProgress = totalStudents > 0 ? Math.round(totalProgress / totalStudents) : 0;
+  const averageMastery = studentsWithMastery > 0 ? Math.round(totalMastery / studentsWithMastery) : 0;
+
+  // Course structure stats
+  let totalLessonsCount = 0;
+  let totalAssessmentsCount = 0;
+
+  course.modules.forEach((mod) => {
+    totalLessonsCount += ((mod.studyTopics as any[]) || []).length;
+    if (mod.quizQuestions.length > 0) {
+      totalAssessmentsCount++;
+    }
+  });
+
+  return {
+    ...course,
+    overallProgress: averageProgress,
+    overallMastery: averageMastery,
+    stats: {
+      masteryRequirement: course.masteryRequirement,
+      averageMastery: averageMastery,
+      totalStudents: totalStudents,
+      modulesTotal: course.totalModules,
+      lessonsTotal: totalLessonsCount,
+      assessmentsTotal: totalAssessmentsCount,
+      courseLength: course.courseLength,
+    },
+  };
+};
+
 export const CourseSetupService = {
   courseSetup,
   generateQuiz,
@@ -1293,4 +1661,11 @@ export const CourseSetupService = {
   getTeacherPublishedCourses,
   removeTeacherFromCourse,
   getStudentProgressSummary,
+  completeLesson,
+  getStudentCourseDetails,
+  getTeacherCourseDetails,
 };
+
+
+
+
