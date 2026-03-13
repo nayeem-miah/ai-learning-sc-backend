@@ -11,4 +11,10 @@ router.get(
   DashboardController.getDashboardData,
 );
 
+router.get(
+  "/teacher/summery",
+  auth(Role.TEACHER),
+  DashboardController.getTeacherDashboardData,
+);
+
 export const DashboardRoutes = router;
