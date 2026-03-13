@@ -403,7 +403,50 @@ const getStudentProgressSummary = catchAsync(
   },
 );
 
+const completeLesson = catchAsync(
+  async (req: Request & { user?: any }, res: Response) => {
+    const { lessonId } = req.body;
+    const studentId = req.user.userId;
+
+    if (!lessonId) {
+      res.status(httpStatus.BAD_REQUEST).json({
+        success: false,
+        message: 'lessonId is required',
+      });
+      return;
+    }
+
+    const result = await CourseSetupService.completeLesson(studentId, lessonId);
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: 'Lesson marked as completed',
+      data: result,
+    });
+  },
+);
+
+
+const getStudentCourseDetails = catchAsync(
+  async (req: Request & { user?: any }, res: Response) => {
+    const { id } = req.params;
+    const studentId = req.user.userId;
+    const result = await CourseSetupService.getStudentCourseDetails(
+      studentId,
+      id,
+    );
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: 'Student course details fetched successfully',
+      data: result,
+    });
+  },
+);
+
 export const CourseSetupController = {
+
   courseSetup,
   generateQuiz,
   submitQuizAnswer,
@@ -423,4 +466,8 @@ export const CourseSetupController = {
   getTeacherPublishedCourses,
   removeTeacherFromCourse,
   getStudentProgressSummary,
+  completeLesson,
+  getStudentCourseDetails,
 };
+
+
