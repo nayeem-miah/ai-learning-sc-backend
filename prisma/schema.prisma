@@ -87,8 +87,8 @@ model User {
   attendanceRecords    AttendanceRecord[]
   courseNameGenerators CourseNameGenerator[]
 
-  feedbackGiven        Feedback[]            @relation("TeacherFeedback")
-  feedbackReceived     Feedback[]            @relation("StudentFeedback")
+  feedbackGiven    Feedback[] @relation("TeacherFeedback")
+  feedbackReceived Feedback[] @relation("StudentFeedback")
 }
 
 model UserLink {
@@ -408,23 +408,23 @@ model QuizAnswer {
   question QuizQuestion @relation(fields: [questionId], references: [questionId], onDelete: Cascade)
 }
 
-// -------- FEEDBACK --------
+// -------- FEEDBACK -------- / ---------Notificatio-----------
 
 model Feedback {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  teacherId       String   @db.ObjectId
-  studentId       String   @db.ObjectId
-  courseId        String   @db.ObjectId
-  moduleId        String?  @db.ObjectId  
-  content         String   
-  isRead          Boolean  @default(false)
-  createdAt       DateTime @default(now())
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  teacherId String   @db.ObjectId
+  studentId String   @db.ObjectId
+  courseId  String   @db.ObjectId
+  moduleId  String?  @db.ObjectId
+  content   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
 
   // Relations
-  teacher         User                    @relation("TeacherFeedback", fields: [teacherId], references: [id], onDelete: Cascade)
-  student         User                    @relation("StudentFeedback", fields: [studentId], references: [id], onDelete: Cascade)
-  course          CourseNameGenerator     @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  module          CourseLectureGenerator? @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  teacher User                    @relation("TeacherFeedback", fields: [teacherId], references: [id], onDelete: Cascade)
+  student User                    @relation("StudentFeedback", fields: [studentId], references: [id], onDelete: Cascade)
+  course  CourseNameGenerator     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  module  CourseLectureGenerator? @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
   @@index([studentId, isRead])
 }
