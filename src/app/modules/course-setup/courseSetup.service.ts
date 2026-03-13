@@ -654,8 +654,12 @@ const getAllCourses = async () => {
           },
         },
       },
+      quizzes: {
+        orderBy: { questionNumber: 'asc' },
+      },
     },
   });
+
 
   return courses;
 };
@@ -696,8 +700,12 @@ const getCourseBySession = async (uniqueSessionId: string) => {
           },
         },
       },
+      quizzes: {
+        orderBy: { questionNumber: 'asc' },
+      },
     },
   });
+
 
   if (!course) {
     throw new ApiError(404, `Course not found for session: ${uniqueSessionId}`);
@@ -1032,8 +1040,12 @@ const getCourseById = async (id: string) => {
           },
         },
       },
+      quizzes: {
+        orderBy: { questionNumber: 'asc' },
+      },
     },
   });
+
 
   if (!course) {
     throw new ApiError(404, 'Course not found');
