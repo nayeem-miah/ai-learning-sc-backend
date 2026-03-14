@@ -34,8 +34,6 @@ router.get(
   CourseSetupController.getStudentCourseDetails,
 );
 
-
-
 //
 
 router.get(
@@ -50,8 +48,7 @@ router.get(
   CourseSetupController.getTeacherCourseDetails,
 );
 
-
-router.get('/:id', CourseSetupController.getCourseById);
+// router.get('/:id', CourseSetupController.getCourseById);
 
 router.get('/:session_id', CourseSetupController.getCourseBySession);
 

@@ -761,48 +761,40 @@ const submitModuleQuiz = async (
     create: { userId: body.unique_user_id, isActive: true },
   });
 
-  // 3. Submit each answer to AI, collect results
-  const submissionResults: {
-    question_id: string;
-    selected_answer: string;
-    is_correct: boolean;
-    correct_answer: string;
-  }[] = [];
+  // 3. Submit each answer to AI in parallel, collect results
+  const submissionResults = await Promise.all(
+    body.answers.map(async (ans) => {
+      try {
+        const qRecord = module.quizQuestions.find((q) => q.questionId === ans.question_id);
+        const originalId = qRecord?.originalQuestionId || ans.question_id;
 
-  for (const ans of body.answers) {
-    let aiResult: {
-      success: boolean;
-      is_correct: boolean;
-      correct_answer: string;
-      message: string;
-    };
-    try {
-      aiResult = await submitAnswerToAI({
-        unique_user_id: body.unique_user_id,
-        unique_session_id: body.unique_session_id,
-        question_id: ans.question_id,
-        selected_answer: ans.selected_answer,
-      });
-    } catch (err) {
-      throw new ApiError(
-        502,
-        `Failed to submit answer for question ${ans.question_id}: ${getAIError(err, 'Unknown error')}`,
-      );
-    }
+        const aiResult = await submitAnswerToAI({
+          unique_user_id: body.unique_user_id,
+          unique_session_id: body.unique_session_id,
+          question_id: originalId,
+          selected_answer: ans.selected_answer,
+        });
 
-    submissionResults.push({
-      question_id: ans.question_id,
-      selected_answer: ans.selected_answer.toUpperCase(),
-      is_correct: aiResult.is_correct,
-      correct_answer: aiResult.correct_answer,
-    });
+        // Update correctAnswer in QuizQuestion table (now we know it)
+        await prisma.quizQuestion.updateMany({
+          where: { questionId: ans.question_id },
+          data: { correctAnswer: aiResult.correct_answer },
+        });
 
-    // Update correctAnswer in QuizQuestion table
-    await prisma.quizQuestion.updateMany({
-      where: { questionId: ans.question_id },
-      data: { correctAnswer: aiResult.correct_answer },
-    });
-  }
+        return {
+          question_id: ans.question_id,
+          selected_answer: ans.selected_answer.toUpperCase(),
+          is_correct: aiResult.is_correct,
+          correct_answer: aiResult.correct_answer,
+        };
+      } catch (err) {
+        throw new ApiError(
+          502,
+          `Failed to submit answer for question ${ans.question_id}: ${getAIError(err, 'Unknown error')}`,
+        );
+      }
+    }),
+  );
 
   // 4. Delete any previous answers by this user for this module's questions
   const moduleQuestionIds = module.quizQuestions.map((q) => q.questionId);
@@ -949,12 +941,24 @@ const getModuleQuizResult = async (query: {
     wrong_answers: wrongCount,
     score_percentage: scorePercentage,
     submitted_at: answers[answers.length - 1].submittedAt,
-    details: answers.map((a) => ({
-      question_id: a.questionId,
-      selected_answer: a.selectedAnswer,
-      correct_answer: a.correctAnswer,
-      is_correct: a.isCorrect,
-    })),
+    details: answers.map((a) => {
+      const q = module.quizQuestions.find(
+        (qq) => qq.questionId === a.questionId,
+      );
+      return {
+        question_id: a.questionId,
+        question_text: q?.questionText || '',
+        options: {
+          A: q?.optionA || '',
+          B: q?.optionB || '',
+          C: q?.optionC || '',
+          D: q?.optionD || '',
+        },
+        selected_answer: a.selectedAnswer,
+        correct_answer: a.correctAnswer,
+        is_correct: a.isCorrect,
+      };
+    }),
   };
 };
 
