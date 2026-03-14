@@ -74,7 +74,7 @@ router.get('/:id', auth(), UserController.getStudentById);
 router.patch('/:id', auth(Role.ADMIN), UserController.toggleUserRole);
 
 // admin delete user account
-router.delete('/:id', UserController.deleteStudent);
+router.delete('/:id', UserController.deleteUser);
 // user delete his account
 router.delete('/me/delete', auth(), UserController.deleteMe);
 
