@@ -1740,6 +1740,151 @@ const getTeacherCourseDetails = async (teacherId: string, courseId: string) => {
   };
 };
 
+const getStudentPublishedCoursesWithResults = async (studentId: string) => {
+  const profile = await prisma.studentProfile.findUnique({
+    where: { userId: studentId },
+  });
+  const aiUserId = (profile as any)?.aiUserId;
+
+  const courses = await prisma.courseNameGenerator.findMany({
+    where: {
+      isPublished: true,
+      enrollments: {
+        some: {
+          studentId,
+        },
+      },
+    },
+    include: {
+      modules: {
+        orderBy: { moduleNumber: 'asc' },
+        include: {
+          lessonProgresses: {
+            where: { studentId },
+          },
+          quizQuestions: {
+            orderBy: { questionNumber: 'asc' },
+          },
+        },
+      },
+      quizzes: {
+        orderBy: { questionNumber: 'asc' },
+      },
+      class: true,
+    },
+  });
+
+  const result = await Promise.all(
+    courses.map(async (course) => {
+      const totalModules = course.totalModules;
+      const completedModules = course.modules.filter(
+        (m) =>
+          m.lessonProgresses.length > 0 && m.lessonProgresses[0].isCompleted,
+      ).length;
+
+      const progressPercentage =
+        totalModules > 0
+          ? Math.round((completedModules / totalModules) * 100)
+          : 0;
+
+      let overallMastery = 0;
+      let modulesWithQuizzesCount = 0;
+      let totalMasteryScore = 0;
+
+      const { quizzes, ...courseData } = course;
+
+      const mappedModules = await Promise.all(
+        course.modules.map(async (mod) => {
+          const isCompleted =
+            mod.lessonProgresses.length > 0 &&
+            mod.lessonProgresses[0].isCompleted;
+
+          // If module-level quizQuestions is empty, try to filter from top-level quizzes
+          let moduleQuizzes = mod.quizQuestions;
+          if (moduleQuizzes.length === 0 && quizzes.length > 0) {
+            moduleQuizzes = quizzes.filter(
+              (q: any) =>
+                q.moduleId === mod.id ||
+                q.questionId.includes(`_MOD${mod.moduleNumber}_`),
+            );
+          }
+
+          let quizScore = null;
+          let quizResult = [];
+          let pointsEarned = 0;
+          let correctAnswersCount = '0/0';
+          let accuracy = 0;
+
+          if (aiUserId) {
+            const questionIds = moduleQuizzes.map((q: any) => q.questionId);
+            if (questionIds.length > 0) {
+              const answers = await prisma.quizAnswer.findMany({
+                where: {
+                  uniqueUserId: aiUserId,
+                  uniqueSessionId: course.uniqueSessionId,
+                  questionId: { in: questionIds },
+                },
+              });
+
+              if (answers.length > 0) {
+                const correct = answers.filter((a) => a.isCorrect).length;
+                quizScore = Math.round((correct / moduleQuizzes.length) * 100);
+                totalMasteryScore += quizScore;
+                modulesWithQuizzesCount++;
+
+                pointsEarned = correct * 10; // Assume 10 points per correct answer
+                correctAnswersCount = `${correct}/${moduleQuizzes.length}`;
+                accuracy = quizScore;
+
+                quizResult = moduleQuizzes.map((q: any) => {
+                  const ans = answers.find((a) => a.questionId === q.questionId);
+                  return {
+                    questionId: q.questionId,
+                    questionText: q.questionText,
+                    optionA: q.optionA,
+                    optionB: q.optionB,
+                    optionC: q.optionC,
+                    optionD: q.optionD,
+                    selectedAnswer: ans?.selectedAnswer || null,
+                    correctAnswer: q.correctAnswer,
+                    isCorrect: ans?.isCorrect || false,
+                  };
+                });
+              }
+            }
+          }
+
+          return {
+            ...mod,
+            quizQuestions: moduleQuizzes,
+            isCompleted,
+            quizScore,
+            pointsEarned,
+            correctAnswersCount,
+            accuracy,
+            quizResult,
+          };
+        }),
+      );
+
+      if (modulesWithQuizzesCount > 0) {
+        overallMastery = Math.round(
+          totalMasteryScore / modulesWithQuizzesCount,
+        );
+      }
+
+      return {
+        ...courseData,
+        modules: mappedModules,
+        overallProgress: progressPercentage,
+        overallMastery,
+      };
+    }),
+  );
+
+  return result;
+};
+
 export const CourseSetupService = {
   courseSetup,
   generateQuiz,
@@ -1763,6 +1908,7 @@ export const CourseSetupService = {
   completeLesson,
   getStudentCourseDetails,
   getTeacherCourseDetails,
+  getStudentPublishedCoursesWithResults,
 };
 
 

@@ -484,6 +484,20 @@ const getTeacherCourseDetails = catchAsync(
   },
 );
 
+const getStudentPublishedCoursesWithResults = catchAsync(
+  async (req: Request & { user?: any }, res: Response) => {
+    const studentId = req.user.userId;
+    const result =
+      await CourseSetupService.getStudentPublishedCoursesWithResults(studentId);
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: 'Student published courses with results fetched successfully',
+      data: result,
+    });
+  },
+);
+
 export const CourseSetupController = {
 
   courseSetup,
@@ -508,4 +522,5 @@ export const CourseSetupController = {
   completeLesson,
   getStudentCourseDetails,
   getTeacherCourseDetails,
+  getStudentPublishedCoursesWithResults,
 };
