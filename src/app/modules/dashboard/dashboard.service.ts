@@ -94,7 +94,85 @@ const getTeacherDashboardData = async (userId: string) => {
   };
 };
 
+const getStudentDashboardData = async (studentId: string) => {
+  // 1. Fetch user & basic details
+  const student = await prisma.user.findUnique({
+    where: { id: studentId, role: Role.STUDENT },
+    include: {
+      studentProfile: true,
+      studentClasses: { include: { class: true } },
+      enrollments: true,
+    },
+  });
+
+  if (!student) {
+    throw new Error("Student not found");
+  }
+
+  // 2. Overall Mastery (Average of progressPercentage from enrollments)
+  const enrollments = student.enrollments || [];
+  const enrolledCoursesCount = enrollments.length;
+  const totalProgress = enrollments.reduce(
+    (sum, en) => sum + (en.progressPercentage || 0),
+    0
+  );
+  const overallMastery =
+    enrolledCoursesCount > 0
+      ? Math.round(totalProgress / enrolledCoursesCount)
+      : 0;
+
+  // 3. Today's Activity
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+
+  const endOfDay = new Date();
+  endOfDay.setHours(23, 59, 59, 999);
+
+  // Completed Lessons today
+  const lessonsCompletedToday = await prisma.lessonProgress.count({
+    where: {
+      studentId: studentId,
+      isCompleted: true,
+      completedAt: {
+        gte: startOfDay,
+        lte: endOfDay,
+      },
+    },
+  });
+
+  // Quizzes completed today (Answers submitted today)
+  let quizzesCompletedToday = 0;
+  if (student.studentProfile?.aiUserId) {
+    quizzesCompletedToday = await prisma.quizAnswer.count({
+      where: {
+        uniqueUserId: student.studentProfile.aiUserId,
+        submittedAt: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+      },
+    });
+  }
+
+  return {
+    studentInfo: {
+      id: student.id,
+      name: `${student.firstName} ${student.lastName}`,
+      email: student.email,
+      gradeLevel: student.studentClasses[0]?.class?.gradeLevel || "N/A",
+      profilePicture: student.profilePicture,
+    },
+    overallMastery,
+    coursesAdmitted: enrolledCoursesCount,
+    todayActivity: {
+      lessonsCompleted: lessonsCompletedToday,
+      quizzesCompleted: quizzesCompletedToday,
+    },
+  };
+};
+
 export const DashboardService = {
   getDashboardData,
   getTeacherDashboardData,
+  getStudentDashboardData,
 };

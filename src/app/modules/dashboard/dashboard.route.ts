@@ -17,4 +17,18 @@ router.get(
   DashboardController.getTeacherDashboardData,
 );
 
+// get a specific student's dashboard (for teacher, admin, or parent who has access)
+router.get(
+  "/student/summery/:id",
+  auth(Role.ADMIN, Role.TEACHER, Role.STUDENT),
+  DashboardController.getStudentDashboardData,
+);
+
+// get own student dashboard (for student)
+router.get(
+  "/student/summery",
+  auth(Role.STUDENT),
+  DashboardController.getStudentDashboardData,
+);
+
 export const DashboardRoutes = router;
