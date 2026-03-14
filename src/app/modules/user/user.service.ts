@@ -731,6 +731,7 @@ const getSingleStudentManagementDetail = async (
           }
 
           let quizScore = null;
+          let quizHistory: any[] = [];
           if (aiUserId) {
             const questionIds = mod.quizQuestions.map((q) => q.questionId);
             if (questionIds.length > 0) {
@@ -747,9 +748,34 @@ const getSingleStudentManagementDetail = async (
                 quizScore = Math.round((correct / answers.length) * 100);
                 courseTotalMasteryScore += quizScore;
                 courseModWithQuizCount++;
+
+                quizHistory = mod.quizQuestions.map((q) => {
+                  const ans = answers.find((a) => a.questionId === q.questionId);
+                  return {
+                    questionId: q.questionId,
+                    questionText: q.questionText,
+                    optionA: q.optionA,
+                    optionB: q.optionB,
+                    optionC: q.optionC,
+                    optionD: q.optionD,
+                    selectedAnswer: ans?.selectedAnswer || null,
+                    correctAnswer: q.correctAnswer,
+                    isCorrect: ans?.isCorrect || false,
+                  };
+                });
               }
             }
           }
+
+          // Fetch teacher feedback for this module
+          const feedback = await prisma.feedback.findFirst({
+            where: {
+              studentId,
+              courseId: course.id,
+              moduleId: mod.id,
+            },
+            orderBy: { createdAt: 'desc' },
+          });
 
           return {
             id: mod.id,
@@ -758,6 +784,8 @@ const getSingleStudentManagementDetail = async (
             isCompleted,
             quizScore,
             totalLessons: lessons.length,
+            quizHistory,
+            teacherFeedback: feedback?.content || null,
           };
         }),
       );
