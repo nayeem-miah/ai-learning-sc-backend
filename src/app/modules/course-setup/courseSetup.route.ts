@@ -22,6 +22,12 @@ router.get(
   CourseSetupController.getStudentPublishedCourses,
 );
 
+router.get(
+  '/student/my-published-courses-with-results',
+  auth(Role.STUDENT),
+  CourseSetupController.getStudentPublishedCoursesWithResults,
+);
+
 router.post(
   '/student/complete-lesson',
   auth(Role.STUDENT),
