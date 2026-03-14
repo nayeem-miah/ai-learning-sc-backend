@@ -111,14 +111,14 @@ const toggleUserRole = catchAsync(
   },
 );
 
-const deleteStudent = catchAsync(async (req: Request, res: Response) => {
+const deleteUser = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const result = await UserService.deleteStudent(id);
+  const result = await UserService.deleteUser(id);
 
   sendResponse(res, {
     statusCode: 200,
     success: true,
-    message: "Student deleted successfully",
+    message: "User deleted successfully",
     data: result,
   });
 });
@@ -242,7 +242,7 @@ export const UserController = {
   getAllTeachers,
   getStudentById,
   updateProfile,
-  deleteStudent,
+  deleteUser,
   getMyProfile,
   toggleUserRole,
   deleteMe,

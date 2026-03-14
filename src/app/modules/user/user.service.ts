@@ -281,11 +281,18 @@ const toggleUserRole = async (userId: string) => {
   return updatedUser;
 };
 
-const deleteStudent = async (id: string) => {
+const deleteUser = async (id: string) => {
   const result = await prisma.$transaction(async (tx) => {
-    await tx.studentProfile.delete({
+    // Delete student profile if exists
+    await tx.studentProfile.deleteMany({
       where: { userId: id },
     });
+
+    // Delete teacher profile if exists
+    await tx.teacherProfile.deleteMany({
+      where: { userId: id },
+    });
+
     return await tx.user.delete({
       where: { id },
     });
@@ -873,7 +880,7 @@ export const UserService = {
   getAllTeachers,
   getStudentById,
   updateProfile,
-  deleteStudent,
+  deleteUser,
   getMyProfile,
   deleteMe,
   toggleUserRole,
