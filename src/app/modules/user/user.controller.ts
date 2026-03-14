@@ -31,7 +31,6 @@ const getAllStudents = catchAsync(async (req: Request, res: Response) => {
 
 const getAllTeachers = catchAsync(async (req: Request, res: Response) => {
   const result = await UserService.getAllTeachers();
-
   sendResponse(res, {
     statusCode: 200,
     success: true,
@@ -43,9 +42,7 @@ const getAllTeachers = catchAsync(async (req: Request, res: Response) => {
 const getMyProfile = catchAsync(
   async (req: Request & { user?: any }, res: Response) => {
     const decodedUser = req.user as any;
-
     const result = await UserService.getMyProfile(decodedUser.userId);
-
     sendResponse(res, {
       statusCode: 200,
       success: true,
@@ -141,55 +138,51 @@ const deleteMe = catchAsync(
   },
 );
 
-const createUserLink = catchAsync(async (req: Request & { user?: any }, res: Response) => {
-  const userId = req.user.userId;
-  const { email, password } = req.body;
+const createUserLink = catchAsync(
+  async (req: Request & { user?: any }, res: Response) => {
+    const userId = req.user.userId;
+    const { email, password } = req.body;
 
-  const result = await UserService.createUserLink(
-    userId,
-    email,
-    password
-  );
+    const result = await UserService.createUserLink(userId, email, password);
 
-  sendResponse(res, {
-    statusCode: 200,
-    success: true,
-    message: "User link created successfully",
-    data: result,
-  });
-});
+    sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: "User link created successfully",
+      data: result,
+    });
+  },
+);
 
+const removeUserLink = catchAsync(
+  async (req: Request & { user?: any }, res: Response) => {
+    const userId = req.user.userId;
+    const { targetUserId } = req.params;
 
-const removeUserLink = catchAsync(async (req: Request & { user?: any }, res: Response) => {
-  const userId = req.user.userId;
-  const { targetUserId } = req.params;
+    const result = await UserService.removeUserLink(userId, targetUserId);
 
-  const result = await UserService.removeUserLink(
-    userId,
-    targetUserId
-  );
+    sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: result.message,
+    });
+  },
+);
 
-  sendResponse(res, {
-    statusCode: 200,
-    success: true,
-    message: result.message,
-  });
+const getLinkedUsers = catchAsync(
+  async (req: Request & { user?: any }, res: Response) => {
+    const userId = req.user.userId;
 
-})
+    const users = await UserService.getLinkedUsers(userId);
 
-const getLinkedUsers = catchAsync(async (req: Request & { user?: any }, res: Response) => {
-  const userId = req.user.userId;
-
-  const users = await UserService.getLinkedUsers(userId);
-
-  sendResponse(res, {
-    statusCode: 200,
-    success: true,
-    message: "Linked users fetched successfully",
-    data: users,
-  });
-})
-
+    sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: "Linked users fetched successfully",
+      data: users,
+    });
+  },
+);
 
 const getStudentManagementData = catchAsync(
   async (req: Request & { user?: any }, res: Response) => {
@@ -205,7 +198,7 @@ const getStudentManagementData = catchAsync(
     sendResponse(res, {
       statusCode: 200,
       success: true,
-      message: 'Student management data fetched successfully',
+      message: "Student management data fetched successfully",
       data: result,
     });
   },
@@ -225,13 +218,11 @@ const getSingleStudentManagementDetail = catchAsync(
     sendResponse(res, {
       statusCode: 200,
       success: true,
-      message: 'Single student management detail fetched successfully',
+      message: "Single student management detail fetched successfully",
       data: result,
     });
   },
 );
-
-
 
 export const UserController = {
   registerStudent,
@@ -249,4 +240,3 @@ export const UserController = {
   getStudentManagementData,
   getSingleStudentManagementDetail,
 };
-
