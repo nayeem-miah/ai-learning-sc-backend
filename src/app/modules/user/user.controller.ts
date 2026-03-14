@@ -224,6 +224,18 @@ const getSingleStudentManagementDetail = catchAsync(
   },
 );
 
+const getAdminAndTeacherList = catchAsync(async (req: Request, res: Response) => {
+  const result = await UserService.getAdminAndTeacherList();
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Admin and teacher list fetched successfully",
+    meta: result.meta,
+    data: result.data,
+  });
+});
+
 export const UserController = {
   registerStudent,
   getAllStudents,
@@ -239,4 +251,5 @@ export const UserController = {
   getLinkedUsers,
   getStudentManagementData,
   getSingleStudentManagementDetail,
+  getAdminAndTeacherList,
 };

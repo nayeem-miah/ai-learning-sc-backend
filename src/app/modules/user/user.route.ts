@@ -61,6 +61,12 @@ router.get(
   auth(Role.ADMIN, Role.STUDENT, Role.TEACHER),
   UserController.getAllTeachers,
 );
+
+router.get(
+  '/admin-teacher-list',
+  auth(Role.ADMIN),
+  UserController.getAdminAndTeacherList,
+);
 router.get('/me', auth(), UserController.getMyProfile);
 router.get('/:id', auth(), UserController.getStudentById);
 

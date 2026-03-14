@@ -842,6 +842,31 @@ const getSingleStudentManagementDetail = async (
 };
 
 
+const getAdminAndTeacherList = async () => {
+  const users = await prisma.user.findMany({
+    where: {
+      role: {
+        in: [Role.ADMIN, Role.TEACHER],
+      },
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+
+  const totalAdmin = users.filter((u) => u.role === Role.ADMIN).length;
+  const totalTeacher = users.filter((u) => u.role === Role.TEACHER).length;
+
+  return {
+    meta: {
+      totalAdmin,
+      totalTeacher,
+      total: users.length,
+    },
+    data: users,
+  };
+};
+
 export const UserService = {
   registerStudent,
   getAllStudents,
@@ -857,5 +882,6 @@ export const UserService = {
   getLinkedUsers,
   getStudentManagementData,
   getSingleStudentManagementDetail,
+  getAdminAndTeacherList,
 };
 
