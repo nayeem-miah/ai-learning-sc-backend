@@ -2,6 +2,7 @@
 import http, { Server } from "http";
 import app from "./app";
 import config from "./app/config";
+import { initializeSocket } from "./app/utils/socket";
 import { seedAdmin } from "./app/utils/seedAdmin";
 
 async function bootstrap() {
@@ -10,6 +11,7 @@ async function bootstrap() {
     try {
 
         server = http.createServer(app);
+        initializeSocket(server);
 
 
         server.listen(config.port, () => {

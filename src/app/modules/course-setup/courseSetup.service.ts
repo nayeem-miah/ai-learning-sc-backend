@@ -4,6 +4,8 @@ import axios, { AxiosError } from 'axios';
 import config from '../../config';
 import ApiError from '../../errors/apiError';
 import { prisma } from '../../prisma/prisma';
+import emailSender from '../../utils/emailSender';
+import { getIo } from '../../utils/socket';
 import { TCourseFromAi, TCourseSetupPayload } from './course.types';
 
 const AI_BASE = config.AI_BASE_API || 'http://206.162.244.135:8000';
@@ -11,7 +13,7 @@ const AI_BASE = config.AI_BASE_API || 'http://206.162.244.135:8000';
 const aiClient = axios.create({
   baseURL: AI_BASE,
   headers: { 'Content-Type': 'application/json' },
-  timeout: 300000,
+  timeout: 600000,
 });
 
 // ── Error helper
@@ -303,7 +305,7 @@ const courseSetup = async (body: TCourseSetupPayload) => {
   }
 
   // PHASE 2 — DB SAVE (only runs if ALL AI steps succeeded)
-  return await prisma.$transaction(
+  const result = await prisma.$transaction(
     async (tx) => {
       // DB SAVE 1: UserId
       await tx.userId.upsert({
@@ -466,6 +468,9 @@ const courseSetup = async (body: TCourseSetupPayload) => {
         }
       }
 
+      // implement socket io
+      // course crate hoye gela notifection patono hobe email and socket io --------- socket a frontend a notifiction patiabo aiCourseRecord.id,  ei id ta patabo email a ekta button thakbe then frontend url a redirect hobe admin/courses/:id/publish  a
+
       return {
         success: true,
         unique_user_id: uniqueUserId,
@@ -491,6 +496,44 @@ const courseSetup = async (body: TCourseSetupPayload) => {
       timeout: 60000,
     },
   );
+
+  // ── NOTIFICATIONS ──
+  try {
+    console.log('email send start ------------------->');
+    const adminEmail = config.admin.email;
+    if (adminEmail) {
+      const publishLink = `${config.clientUrl}/admin/courses/${result.id}/publish`;
+      const html = `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+          <h2 style="color: #4CAF50;">Course Generated Successfully!</h2>
+          <p>The course <strong>"${result.course_title}"</strong> has been generated and is ready for review.</p>
+          <p>Please click the button below to publish the course:</p>
+          <a href="${publishLink}" style="display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">Publish Course</a>
+          <br/><br/>
+          <p>If the button doesn't work, copy and paste this link: <br/> ${publishLink}</p>
+        </div>
+      `;
+      await emailSender('New Course Generated!', adminEmail, html);
+    }
+
+    console.log('email send end ------------------->');
+
+    console.log(result.id, 'result.id');
+
+    // Socket notification
+    console.log('socket notification start ------------------->');
+    const io = getIo();
+    io.emit('course-generated', {
+      message: `Course "${result.course_title}" has been generated!`,
+      courseId: result.id,
+    });
+    console.log('socket notification end ------------------->');
+  } catch (err) {
+    console.error('Notification failed:', err);
+    // We don't throw here to avoid failing the successful course creation
+  }
+
+  return result;
 };
 
 const generateQuiz = async (body: {
