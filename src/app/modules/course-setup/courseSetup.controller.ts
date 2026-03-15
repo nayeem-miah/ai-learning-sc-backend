@@ -105,68 +105,60 @@ const generateQuiz = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const submitQuizAnswer = catchAsync(
-  async (req: Request & { user?: any }, res: Response) => {
-    const {
-      unique_user_id,
-      unique_session_id,
-      question_id,
-      selected_answer,
-      module_id,
-      answers,
-    } = req.body;
+const submitQuizAnswer = catchAsync(async (req: Request & { user?: any }, res: Response) => {
+  const { unique_user_id, unique_session_id, question_id, selected_answer, module_id, answers } =
+    req.body;
 
-    // Check if it's a bulk submission (module_id and answers array provided)
-    if (module_id && answers && Array.isArray(answers)) {
-      const result = await CourseSetupService.submitModuleQuiz(
-        req.user?.userId || unique_user_id,
-        {
-          unique_user_id,
-          unique_session_id,
-          module_id,
-          answers,
-        },
-      );
-
-      sendResponse(res, {
-        statusCode: httpStatus.OK,
-        success: true,
-        message: 'Module quiz submitted successfully',
-        data: result,
-      });
-      return;
-    }
-
-    // Single answer submission fallback
-    if (
-      !unique_user_id ||
-      !unique_session_id ||
-      !question_id ||
-      !selected_answer
-    ) {
-      res.status(httpStatus.BAD_REQUEST).json({
-        success: false,
-        message:
-          'All fields are required: unique_user_id, unique_session_id, question_id, selected_answer',
-      });
-      return;
-    }
-
-    const result = await CourseSetupService.submitQuizAnswer({
-      unique_user_id,
-      unique_session_id,
-      question_id,
-      selected_answer,
-    });
+  // Check if it's a bulk submission (module_id and answers array provided)
+  if (module_id && answers && Array.isArray(answers)) {
+    const result = await CourseSetupService.submitModuleQuiz(
+      req.user?.userId || unique_user_id,
+      {
+        unique_user_id,
+        unique_session_id,
+        module_id,
+        answers,
+      }
+    );
 
     sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,
-      message: 'Answer submitted successfully',
+      message: 'Module quiz submitted successfully',
       data: result,
     });
-  },
-);
+    return;
+  }
+
+  // Single answer submission fallback
+  if (
+    !unique_user_id ||
+    !unique_session_id ||
+    !question_id ||
+    !selected_answer
+  ) {
+    res.status(httpStatus.BAD_REQUEST).json({
+      success: false,
+      message:
+        'All fields are required: unique_user_id, unique_session_id, question_id, selected_answer',
+    });
+    return;
+  }
+
+  const result = await CourseSetupService.submitQuizAnswer({
+    unique_user_id,
+    unique_session_id,
+    question_id,
+    selected_answer,
+  });
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Answer submitted successfully',
+    data: result,
+  });
+});
 
 const getQuizResults = catchAsync(async (req: Request, res: Response) => {
   const { unique_session_id, unique_user_id } = req.query as {
@@ -217,40 +209,41 @@ const getCourseBySession = catchAsync(async (req: Request, res: Response) => {
 });
 
 // Submit all answers for a single module at once (bulk)
-const submitModuleQuiz = catchAsync(
-  async (req: Request & { user?: any }, res: Response) => {
-    const { unique_user_id, unique_session_id, module_id, answers } = req.body;
+const submitModuleQuiz = catchAsync(async (req: Request & { user?: any }, res: Response) => {
+  const { unique_user_id, unique_session_id, module_id, answers } = req.body;
 
-    if (
-      !unique_user_id ||
-      !unique_session_id ||
-      !module_id ||
-      !Array.isArray(answers) ||
-      answers.length === 0
-    ) {
-      res.status(httpStatus.BAD_REQUEST).json({
-        success: false,
-        message:
-          'Required: unique_user_id, unique_session_id, module_id, answers (non-empty array of { question_id, selected_answer })',
-      });
-      return;
-    }
+  if (
+    !unique_user_id ||
+    !unique_session_id ||
+    !module_id ||
+    !Array.isArray(answers) ||
+    answers.length === 0
+  ) {
+    res.status(httpStatus.BAD_REQUEST).json({
+      success: false,
+      message:
+        'Required: unique_user_id, unique_session_id, module_id, answers (non-empty array of { question_id, selected_answer })',
+    });
+    return;
+  }
 
-    const result = await CourseSetupService.submitModuleQuiz(req.user.userId, {
+  const result = await CourseSetupService.submitModuleQuiz(
+    req.user.userId,
+    {
       unique_user_id,
       unique_session_id,
       module_id,
       answers,
-    });
+    }
+  );
 
-    sendResponse(res, {
-      statusCode: httpStatus.OK,
-      success: true,
-      message: 'Module quiz submitted successfully',
-      data: result,
-    });
-  },
-);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Module quiz submitted successfully',
+    data: result,
+  });
+});
 
 // Get quiz result for a specific user & module (user sees their own result)
 const getModuleQuizResult = catchAsync(async (req: Request, res: Response) => {
@@ -456,6 +449,7 @@ const completeLesson = catchAsync(
   },
 );
 
+
 const getStudentCourseDetails = catchAsync(
   async (req: Request & { user?: any }, res: Response) => {
     const { id } = req.params;
@@ -505,6 +499,7 @@ const getStudentPublishedCoursesWithResults = catchAsync(
 );
 
 export const CourseSetupController = {
+
   courseSetup,
   generateQuiz,
   submitQuizAnswer,
