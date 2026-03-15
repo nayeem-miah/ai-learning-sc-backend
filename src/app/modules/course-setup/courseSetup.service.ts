@@ -409,10 +409,54 @@ const courseSetup = async (body: TCourseSetupPayload) => {
           });
         }
       }
+
       console.log('enrolllmenert ----------------------1');
+
       // DB SAVE 3: CourseLectureGenerator + QuizQuestion per module
       for (const pair of generatedPairs) {
         const mod = pair.module;
+
+        // -- Restructuring Study Topics to include Voice Data --
+        const audioParts = mod.voice?.audio_parts || [];
+
+        const mappedStudyTopics = (mod.study_topics || []).map(
+          (topic: any, index: number) => {
+            const topicIndex = index + 1;
+
+            // Find audio URLs for this specific topic
+            const nameAudio = audioParts.find(
+              (p: any) => p.part_key === `topic_${topicIndex}_name`,
+            )?.audio_url;
+            const summaryAudio = audioParts.find(
+              (p: any) => p.part_key === `topic_${topicIndex}_summary`,
+            )?.audio_url;
+            const detailAudio = audioParts.find(
+              (p: any) =>
+                p.part_key === `topic_${topicIndex}_detailed_explanation`,
+            )?.audio_url;
+
+            return {
+              ...topic,
+              audio_data: {
+                name_audio_url: nameAudio || null,
+                summary_audio_url: summaryAudio || null,
+                detailed_explanation_audio_url: detailAudio || null,
+              },
+            };
+          },
+        );
+
+        // Extract module level audio
+        const moduleVoiceHeader = {
+          title_audio_url:
+            audioParts.find((p: any) => p.part_key === 'title')?.audio_url ||
+            null,
+          introduction_audio_url:
+            audioParts.find((p: any) => p.part_key === 'introduction')
+              ?.audio_url || null,
+          total_duration: mod.voice?.duration_seconds || 0,
+          voice_id: mod.voice?.voice_id || null,
+        };
 
         // Save module (skip if already exists)
         let savedModule = await tx.courseLectureGenerator.findFirst({
@@ -426,8 +470,8 @@ const courseSetup = async (body: TCourseSetupPayload) => {
               moduleNumber: mod.module_number,
               moduleTitle: mod.title,
               introduction: mod.introduction,
-              studyTopics: mod.study_topics as any,
-              voiceData: mod.voice as any,
+              studyTopics: mappedStudyTopics as any,
+              voiceData: moduleVoiceHeader as any,
             },
           });
         }
