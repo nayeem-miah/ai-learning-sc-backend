@@ -101,7 +101,6 @@ const getStudentDashboardData = async (studentId: string) => {
     include: {
       studentProfile: true,
       studentClasses: { include: { class: true } },
-      enrollments: true,
     },
   });
 
@@ -109,65 +108,168 @@ const getStudentDashboardData = async (studentId: string) => {
     throw new Error("Student not found");
   }
 
-  // 2. Overall Mastery (Average of progressPercentage from enrollments)
-  const enrollments = student.enrollments || [];
-  const enrolledCoursesCount = enrollments.length;
-  const totalProgress = enrollments.reduce(
-    (sum, en) => sum + (en.progressPercentage || 0),
-    0
-  );
-  const overallMastery =
-    enrolledCoursesCount > 0
-      ? Math.round(totalProgress / enrolledCoursesCount)
-      : 0;
-
-  // 3. Today's Activity
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-
-  const endOfDay = new Date();
-  endOfDay.setHours(23, 59, 59, 999);
-
-  // Completed Lessons today
-  const lessonsCompletedToday = await prisma.lessonProgress.count({
-    where: {
-      studentId: studentId,
-      isCompleted: true,
-      completedAt: {
-        gte: startOfDay,
-        lte: endOfDay,
+  // Fetch all enrolled published courses for this student
+  const enrollments = await prisma.enrollment.findMany({
+    where: { studentId, aiCourse: { isPublished: true } },
+    include: {
+      aiCourse: {
+        include: {
+          modules: {
+            orderBy: { moduleNumber: "asc" },
+            include: {
+              lessonProgresses: { where: { studentId } },
+              quizQuestions: true,
+            },
+          },
+        },
       },
     },
   });
 
-  // Quizzes completed today (Answers submitted today)
-  let quizzesCompletedToday = 0;
-  if (student.studentProfile?.aiUserId) {
-    quizzesCompletedToday = await prisma.quizAnswer.count({
-      where: {
-        uniqueUserId: student.studentProfile.aiUserId,
-        submittedAt: {
-          gte: startOfDay,
-          lte: endOfDay,
-        },
-      },
-    });
+  let totalMasterySum = 0;
+  let coursesWithMastery = 0;
+
+  const pendingTasksList: any[] = [];
+  const aiUserId = student.studentProfile?.aiUserId;
+
+  const myCourses = await Promise.all(
+    enrollments.map(async (en) => {
+      const course = en.aiCourse;
+      if (!course) return null;
+
+      const totalModules = course.totalModules;
+      const completedModulesCount = course.modules.filter(
+        (m) =>
+          m.lessonProgresses.length > 0 && m.lessonProgresses[0].isCompleted,
+      ).length;
+
+      const progressPercentage =
+        totalModules > 0
+          ? Math.round((completedModulesCount / totalModules) * 100)
+          : 0;
+
+      let mastery = 0;
+      let totalScore = 0;
+      let modulesWithQuizzesCount = 0;
+
+      let courseAnswers: any[] = [];
+      if (aiUserId) {
+        const allQuestionIds = course.modules.flatMap((m) =>
+          m.quizQuestions.map((q) => q.questionId),
+        );
+        if (allQuestionIds.length > 0) {
+          courseAnswers = await prisma.quizAnswer.findMany({
+            where: {
+              uniqueUserId: aiUserId,
+              uniqueSessionId: course.uniqueSessionId,
+              questionId: { in: allQuestionIds },
+            },
+          });
+        }
+      }
+
+      let coursePendingTaskAdded = false;
+
+      for (const mod of course.modules) {
+        const modQIds = mod.quizQuestions.map((q) => q.questionId);
+        let quizCompleted = false;
+        let quizScoreForMod = null;
+
+        if (modQIds.length > 0 && courseAnswers.length > 0) {
+          const modAnswers = courseAnswers.filter((a) =>
+            modQIds.includes(a.questionId),
+          );
+          if (modAnswers.length > 0) {
+            quizCompleted = true;
+            const correct = modAnswers.filter((a) => a.isCorrect).length;
+            quizScoreForMod = Math.round((correct / modQIds.length) * 100);
+            totalScore += quizScoreForMod;
+            modulesWithQuizzesCount++;
+          }
+        }
+
+        // Logic for Pending Tasks
+        if (!coursePendingTaskAdded) {
+          const isLessonCompleted =
+            mod.lessonProgresses.length > 0 &&
+            mod.lessonProgresses[0].isCompleted;
+
+          if (!isLessonCompleted) {
+            pendingTasksList.push({
+              courseId: course.id,
+              courseName: course.generatedCourseName || course.courseName,
+              subject: course.subject || "Subject",
+              moduleId: mod.id,
+              moduleTitle: mod.moduleTitle,
+              moduleNumber: mod.moduleNumber,
+              type: "Lesson",
+              startTime: course.startTime || "9:00 AM",
+              endTime: course.endTime || "10:30 AM",
+            });
+            coursePendingTaskAdded = true;
+          } else if (modQIds.length > 0 && !quizCompleted) {
+            // Lesson is completed but quiz is not
+            pendingTasksList.push({
+              courseId: course.id,
+              courseName: course.generatedCourseName || course.courseName,
+              subject: course.subject || "Subject",
+              moduleId: mod.id,
+              moduleTitle: mod.moduleTitle,
+              moduleNumber: mod.moduleNumber,
+              type: "Quiz",
+              startTime: course.startTime || "9:00 AM",
+              endTime: course.endTime || "10:30 AM",
+            });
+            coursePendingTaskAdded = true;
+          }
+        }
+      }
+
+      if (modulesWithQuizzesCount > 0) {
+        mastery = Math.round(totalScore / modulesWithQuizzesCount);
+        totalMasterySum += mastery;
+        coursesWithMastery++;
+      } else {
+        mastery = 0;
+      }
+
+      return {
+        courseId: course.id,
+        courseName: course.generatedCourseName || course.courseName,
+        subject: course.subject,
+        progressPercentage,
+        mastery,
+        masteryRequired: (course as any).masteryRequirement || 0,
+      };
+    }),
+  );
+
+  const validCourses = myCourses.filter((c) => c !== null);
+  const overallMastery =
+    coursesWithMastery > 0
+      ? Math.round(totalMasterySum / coursesWithMastery)
+      : 0;
+
+  // Next Class (closest pending lesson)
+  let nextClass = null;
+  if (pendingTasksList.length > 0) {
+    nextClass = pendingTasksList[0];
   }
 
   return {
     studentInfo: {
       id: student.id,
       name: `${student.firstName} ${student.lastName}`,
+      firstName: student.firstName,
+      lastName: student.lastName,
       email: student.email,
       gradeLevel: student.studentClasses[0]?.class?.gradeLevel || "N/A",
       profilePicture: student.profilePicture,
     },
     overallMastery,
-    coursesAdmitted: enrolledCoursesCount,
-    todayActivity: {
-      lessonsCompleted: lessonsCompletedToday,
-      quizzesCompleted: quizzesCompletedToday,
-    },
+    nextClass,
+    pendingTasks: pendingTasksList.slice(0, 5), // return up to 5 pending tasks
+    myCourses: validCourses,
   };
 };
 
