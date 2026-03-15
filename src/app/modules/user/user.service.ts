@@ -255,7 +255,7 @@ const toggleUserRole = async (userId: string) => {
   let newRole: Role;
 
   if (user.role === Role.ADMIN) {
-    newRole = Role.STUDENT;
+    newRole = Role.TEACHER;
   } else {
     newRole = Role.ADMIN;
   }
@@ -579,7 +579,9 @@ const getStudentManagementData = async (
   let totalAttendanceRecords = 0;
 
   allFilteredStudents.forEach((student) => {
-    const hasActivity = student.enrollments.some((e) => e.progressPercentage > 0);
+    const hasActivity = student.enrollments.some(
+      (e) => e.progressPercentage > 0,
+    );
     if (hasActivity) {
       engagedCount++;
     } else {
@@ -757,7 +759,9 @@ const getSingleStudentManagementDetail = async (
                 courseModWithQuizCount++;
 
                 quizHistory = mod.quizQuestions.map((q) => {
-                  const ans = answers.find((a) => a.questionId === q.questionId);
+                  const ans = answers.find(
+                    (a) => a.questionId === q.questionId,
+                  );
                   return {
                     questionId: q.questionId,
                     questionText: q.questionText,
@@ -848,7 +852,6 @@ const getSingleStudentManagementDetail = async (
   };
 };
 
-
 const getAdminAndTeacherList = async () => {
   const users = await prisma.user.findMany({
     where: {
@@ -891,4 +894,3 @@ export const UserService = {
   getSingleStudentManagementDetail,
   getAdminAndTeacherList,
 };
-
