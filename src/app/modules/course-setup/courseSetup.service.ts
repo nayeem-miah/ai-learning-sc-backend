@@ -1580,7 +1580,13 @@ const getStudentCourseDetails = async (studentId: string, courseId: string) => {
       }
 
       let quizScore = null;
+      let quizResult: any = [];
+      let pointsEarned = 0;
+      let correctAnswersCount = '0/0';
+      let accuracy = 0;
+
       if (aiUserId && hasQuiz) {
+        correctAnswersCount = `0/${mod.quizQuestions.length}`;
         const questionIds = mod.quizQuestions.map((q) => q.questionId);
         const answers = await prisma.quizAnswer.findMany({
           where: {
@@ -1596,13 +1602,36 @@ const getStudentCourseDetails = async (studentId: string, courseId: string) => {
           totalMasteryScore += quizScore;
           modulesWithQuizzesCount++;
           completedAssessmentsCount++;
+
+          pointsEarned = correct * 10; // Assume 10 points per correct answer
+          correctAnswersCount = `${correct}/${mod.quizQuestions.length}`;
+          accuracy = quizScore;
         }
+
+        quizResult = mod.quizQuestions.map((q: any) => {
+          const ans = answers.find((a) => a.questionId === q.questionId);
+          return {
+            questionId: q.questionId,
+            questionText: q.questionText,
+            optionA: q.optionA,
+            optionB: q.optionB,
+            optionC: q.optionC,
+            optionD: q.optionD,
+            selectedAnswer: ans?.selectedAnswer || null,
+            correctAnswer: q.correctAnswer,
+            isCorrect: ans?.isCorrect || false,
+          };
+        });
       }
 
       return {
         ...mod,
         isCompleted,
         quizScore,
+        pointsEarned,
+        correctAnswersCount,
+        accuracy,
+        quizResult,
       };
     }),
   );
@@ -1619,7 +1648,6 @@ const getStudentCourseDetails = async (studentId: string, courseId: string) => {
 
   return {
     ...courseData,
-    quizQuestions: quizzes,
     modules: mappedModules,
     overallProgress: progressPercentage,
     overallMastery,
@@ -1855,6 +1883,7 @@ const getStudentPublishedCoursesWithResults = async (studentId: string) => {
           if (aiUserId) {
             const questionIds = moduleQuizzes.map((q: any) => q.questionId);
             if (questionIds.length > 0) {
+              correctAnswersCount = `0/${moduleQuizzes.length}`;
               const answers = await prisma.quizAnswer.findMany({
                 where: {
                   uniqueUserId: aiUserId,
@@ -1872,24 +1901,24 @@ const getStudentPublishedCoursesWithResults = async (studentId: string) => {
                 pointsEarned = correct * 10; // Assume 10 points per correct answer
                 correctAnswersCount = `${correct}/${moduleQuizzes.length}`;
                 accuracy = quizScore;
-
-                quizResult = moduleQuizzes.map((q: any) => {
-                  const ans = answers.find(
-                    (a) => a.questionId === q.questionId,
-                  );
-                  return {
-                    questionId: q.questionId,
-                    questionText: q.questionText,
-                    optionA: q.optionA,
-                    optionB: q.optionB,
-                    optionC: q.optionC,
-                    optionD: q.optionD,
-                    selectedAnswer: ans?.selectedAnswer || null,
-                    correctAnswer: q.correctAnswer,
-                    isCorrect: ans?.isCorrect || false,
-                  };
-                });
               }
+
+              quizResult = moduleQuizzes.map((q: any) => {
+                const ans = answers.find(
+                  (a) => a.questionId === q.questionId,
+                );
+                return {
+                  questionId: q.questionId,
+                  questionText: q.questionText,
+                  optionA: q.optionA,
+                  optionB: q.optionB,
+                  optionC: q.optionC,
+                  optionD: q.optionD,
+                  selectedAnswer: ans?.selectedAnswer || null,
+                  correctAnswer: q.correctAnswer,
+                  isCorrect: ans?.isCorrect || false,
+                };
+              });
             }
           }
 
