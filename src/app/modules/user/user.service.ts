@@ -486,11 +486,46 @@ const getStudentManagementData = async (
   };
 
   if (query.searchTerm) {
-    whereCondition.OR = [
-      { firstName: { contains: query.searchTerm, mode: 'insensitive' } },
-      { lastName: { contains: query.searchTerm, mode: 'insensitive' } },
-      { email: { contains: query.searchTerm, mode: 'insensitive' } },
-    ];
+    const term = query.searchTerm.trim();
+    const termUpper = term.toUpperCase();
+    
+    // Find IDs matching the short studentId (last 6 chars of ObjectId)
+    const allUsers = await prisma.user.findMany({ 
+      where: { role: Role.STUDENT },
+      select: { id: true } 
+    });
+    const matchedIds = allUsers
+      .filter((u) => u.id.slice(-6).toUpperCase().includes(termUpper))
+      .map((u) => u.id);
+
+    // Split search term for robust first/last name matching
+    const nameTerms = term.split(/\s+/).filter(Boolean);
+    const nameConditions = nameTerms.map((t) => ({
+      OR: [
+        { firstName: { contains: t, mode: 'insensitive' } },
+        { lastName: { contains: t, mode: 'insensitive' } },
+        { email: { contains: t, mode: 'insensitive' } },
+      ],
+    }));
+
+    const searchOR: any[] = [];
+    
+    if (nameConditions.length > 0) {
+      // By default, terms should be combined with AND. E.g "Nayeem miah" 
+      // => matches firstName='Nayeem' OR lastName='Nayeem' AND firstName='miah' OR lastName='miah'
+      searchOR.push({ AND: nameConditions });
+    }
+    
+    if (matchedIds.length > 0) {
+      searchOR.push({ id: { in: matchedIds } });
+    }
+
+    if (searchOR.length > 0) {
+      whereCondition.OR = searchOR;
+    } else {
+      // Unlikely to happen if query.searchTerm is not empty, but fallback to nothing to match 0 records
+      whereCondition.id = { in: [] };
+    }
   }
 
   // Teacher can only see students in their courses
