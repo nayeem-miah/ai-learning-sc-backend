@@ -171,8 +171,99 @@ const getStudentDashboardData = async (studentId: string) => {
   };
 };
 
+const getStudentProgressData = async (studentId: string) => {
+  // 1. Get enrollments with course details
+  const enrollments = await prisma.enrollment.findMany({
+    where: { studentId },
+    include: {
+      aiCourse: true,
+    },
+  });
+
+  // Calculate Overall Mastery
+  const totalEnrollments = enrollments.length;
+  const overallMastery =
+    totalEnrollments > 0
+      ? Math.round(
+          enrollments.reduce((sum, en) => sum + (en.progressPercentage || 0), 0) /
+            totalEnrollments,
+        )
+      : 0;
+
+  // Calculate Modules Complete
+  const completedLessons = await prisma.lessonProgress.count({
+    where: { studentId, isCompleted: true },
+  });
+
+  const totalModules = enrollments.reduce(
+    (sum, en) => sum + (en.aiCourse?.totalModules || 0),
+    0,
+  );
+
+  // Time spent this week (Mock data for now, as DB has no time tracking)
+  const timeSpentThisWeek = [
+    { day: "Mon", hours: 4 },
+    { day: "Tue", hours: 5 },
+    { day: "Wed", hours: 1 },
+    { day: "Thu", hours: 6 },
+    { day: "Fri", hours: 5 },
+    { day: "Sat", hours: 0 },
+    { day: "Sun", hours: 5 },
+  ];
+
+  const totalHoursThisWeek = timeSpentThisWeek.reduce(
+    (sum, d) => sum + d.hours,
+    0,
+  );
+  const avgHoursPerDay = Math.round(totalHoursThisWeek / 7);
+
+  // Mastery By Course
+  const masteryByCourse = enrollments.map((en) => ({
+    courseName:
+      en.aiCourse?.generatedCourseName ||
+      en.aiCourse?.courseName ||
+      "Unknown Course",
+    mastery: Math.round(en.progressPercentage || 0),
+    masteryRequired: Math.round(en.aiCourse?.masteryRequirement || 0),
+  }));
+
+  // Recent Improvements (Mock data for presentation)
+  const recentImprovements = [
+    {
+      courseName: "Mathematics",
+      moduleName: "Module 1",
+      quizName: "Quiz 2",
+      improvement: 12,
+      description: "Improved by 12% after 1st Re-test",
+    },
+    {
+      courseName: "Mathematics",
+      moduleName: "Module 2",
+      quizName: "Quiz 1",
+      improvement: 8,
+      description: "Improved by 8% after 2nd Re-test",
+    },
+  ];
+
+  return {
+    overallMastery,
+    modulesComplete: {
+      completed: completedLessons,
+      total: totalModules,
+    },
+    timeSpent: {
+      totalHoursThisWeek: totalHoursThisWeek,
+      averagePerDay: avgHoursPerDay,
+      chartData: timeSpentThisWeek,
+    },
+    masteryByCourse,
+    recentImprovements,
+  };
+};
+
 export const DashboardService = {
   getDashboardData,
   getTeacherDashboardData,
   getStudentDashboardData,
+  getStudentProgressData,
 };

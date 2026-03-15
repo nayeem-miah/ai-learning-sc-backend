@@ -16,7 +16,7 @@ router.post(
 
 router.get(
   "/",
-  auth(Role.ADMIN, Role.TEACHER, Role.STUDENT),
+  // auth(Role.ADMIN, Role.TEACHER, Role.STUDENT),
   ClassController.getAllClasses,
 );
 

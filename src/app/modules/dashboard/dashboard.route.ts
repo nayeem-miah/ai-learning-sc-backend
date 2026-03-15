@@ -31,4 +31,18 @@ router.get(
   DashboardController.getStudentDashboardData,
 );
 
+// get a specific student's progress (for teacher, admin, or parent who has access)
+router.get(
+  "/student/progress/:id",
+  auth(Role.ADMIN, Role.TEACHER, Role.STUDENT),
+  DashboardController.getStudentProgressData,
+);
+
+// get own student progress (for student)
+router.get(
+  "/student/progress",
+  auth(Role.STUDENT),
+  DashboardController.getStudentProgressData,
+);
+
 export const DashboardRoutes = router;
