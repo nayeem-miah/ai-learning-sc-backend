@@ -56,7 +56,7 @@ router.get(
 
 router.get('/:id', CourseSetupController.getCourseById);
 
-router.get('/:session_id', CourseSetupController.getCourseBySession);
+// router.get('/:session_id', CourseSetupController.getCourseBySession);
 
 router.patch('/:id', auth(Role.ADMIN), CourseSetupController.updateCourse);
 
