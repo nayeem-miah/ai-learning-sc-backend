@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import axios, { AxiosError } from 'axios';
@@ -1904,9 +1905,7 @@ const getStudentPublishedCoursesWithResults = async (studentId: string) => {
               }
 
               quizResult = moduleQuizzes.map((q: any) => {
-                const ans = answers.find(
-                  (a) => a.questionId === q.questionId,
-                );
+                const ans = answers.find((a) => a.questionId === q.questionId);
                 return {
                   questionId: q.questionId,
                   questionText: q.questionText,
