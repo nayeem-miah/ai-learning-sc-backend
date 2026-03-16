@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Role } from "@prisma/client";
 import { prisma } from "../../prisma/prisma";
 
@@ -7,17 +8,22 @@ const getDashboardData = async (userId: string, role: string) => {
     whereClause = { teacherId: userId };
   }
 
-  const [totalCourses, publishedCourses, draftCourses, recentCourses] = await Promise.all([
-    prisma.courseNameGenerator.count({ where: whereClause }),
-    prisma.courseNameGenerator.count({ where: { ...whereClause, isPublished: true } }),
-    prisma.courseNameGenerator.count({ where: { ...whereClause, isPublished: false } }),
-    prisma.courseNameGenerator.findMany({
-      where: whereClause,
-      orderBy: { createdAt: "desc" },
-      take: 5,
-      include: { class: true },
-    })
-  ]);
+  const [totalCourses, publishedCourses, draftCourses, recentCourses] =
+    await Promise.all([
+      prisma.courseNameGenerator.count({ where: whereClause }),
+      prisma.courseNameGenerator.count({
+        where: { ...whereClause, isPublished: true },
+      }),
+      prisma.courseNameGenerator.count({
+        where: { ...whereClause, isPublished: false },
+      }),
+      prisma.courseNameGenerator.findMany({
+        where: whereClause,
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        include: { class: true },
+      }),
+    ]);
 
   let totalStudents = 0;
 
@@ -25,7 +31,7 @@ const getDashboardData = async (userId: string, role: string) => {
     // Distinct students in teacher's courses
     const uniqueStudents = await prisma.enrollment.findMany({
       where: { aiCourse: { teacherId: userId } },
-      distinct: ['studentId'],
+      distinct: ["studentId"],
       select: { studentId: true },
     });
     totalStudents = uniqueStudents.length;
@@ -39,29 +45,34 @@ const getDashboardData = async (userId: string, role: string) => {
     publishedCourses,
     draftCourses,
     totalStudents,
-    recentCourses
+    recentCourses,
   };
 };
 
 const getTeacherDashboardData = async (userId: string) => {
   const whereClause = { teacherId: userId };
 
-  const [totalCourses, publishedCourses, draftCourses, recentCourses] = await Promise.all([
-    prisma.courseNameGenerator.count({ where: whereClause }),
-    prisma.courseNameGenerator.count({ where: { ...whereClause, isPublished: true } }),
-    prisma.courseNameGenerator.count({ where: { ...whereClause, isPublished: false } }),
-    prisma.courseNameGenerator.findMany({
-      where: whereClause,
-      orderBy: { createdAt: "desc" },
-      take: 5,
-      include: { class: true },
-    })
-  ]);
+  const [totalCourses, publishedCourses, draftCourses, recentCourses] =
+    await Promise.all([
+      prisma.courseNameGenerator.count({ where: whereClause }),
+      prisma.courseNameGenerator.count({
+        where: { ...whereClause, isPublished: true },
+      }),
+      prisma.courseNameGenerator.count({
+        where: { ...whereClause, isPublished: false },
+      }),
+      prisma.courseNameGenerator.findMany({
+        where: whereClause,
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        include: { class: true },
+      }),
+    ]);
 
   // Distinct students in teacher's courses
   const uniqueStudents = await prisma.enrollment.findMany({
     where: { aiCourse: { teacherId: userId } },
-    distinct: ['studentId'],
+    distinct: ["studentId"],
     select: { studentId: true },
   });
   const totalStudents = uniqueStudents.length;
@@ -70,7 +81,7 @@ const getTeacherDashboardData = async (userId: string) => {
   const nextClasses = await prisma.courseNameGenerator.findMany({
     where: {
       teacherId: userId,
-      isPublished: true, 
+      isPublished: true,
     },
     orderBy: {
       createdAt: "desc", // Replace with logic for upcoming date if startDate allows
@@ -287,8 +298,10 @@ const getStudentProgressData = async (studentId: string) => {
   const overallMastery =
     totalEnrollments > 0
       ? Math.round(
-          enrollments.reduce((sum, en) => sum + (en.progressPercentage || 0), 0) /
-            totalEnrollments,
+          enrollments.reduce(
+            (sum, en) => sum + (en.progressPercentage || 0),
+            0,
+          ) / totalEnrollments,
         )
       : 0;
 

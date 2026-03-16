@@ -89,6 +89,9 @@ model User {
 
   feedbackGiven    Feedback[] @relation("TeacherFeedback")
   feedbackReceived Feedback[] @relation("StudentFeedback")
+
+  studySessions StudySession[]
+  quizAttempts  QuizAttempt[]
 }
 
 model UserLink {
@@ -330,11 +333,13 @@ model CourseNameGenerator {
   classId String? @db.ObjectId
   class   Class?  @relation(fields: [classId], references: [id], onDelete: Cascade)
 
-  modules     CourseLectureGenerator[]
-  quizzes     QuizQuestion[]
-  enrollments Enrollment[]
-  attendances Attendance[]
-  feedbacks   Feedback[]
+  modules       CourseLectureGenerator[]
+  quizzes       QuizQuestion[]
+  enrollments   Enrollment[]
+  attendances   Attendance[]
+  feedbacks     Feedback[]
+  studySessions StudySession[]
+  quizAttempts  QuizAttempt[]
 }
 
 // -------- COURSE LECTURE GENERATOR --------
@@ -357,6 +362,7 @@ model CourseLectureGenerator {
   lessonProgresses LessonProgress[]
   attendances      Attendance[]
   feedbacks        Feedback[]
+  quizAttempts     QuizAttempt[]
 
   // Prevent duplicate module numbers per session
   @@unique([uniqueSessionId, moduleNumber])
@@ -427,4 +433,31 @@ model Feedback {
   module  CourseLectureGenerator? @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
   @@index([studentId, isRead])
+}
+
+// -------- DASHBOARD ANALYTICS --------
+
+model StudySession {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  studentId String   @db.ObjectId
+  courseId  String?  @db.ObjectId
+  date      DateTime @default(now()) // When the study session occurred
+  duration  Int // Duration in minutes
+
+  student User                 @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course  CourseNameGenerator? @relation(fields: [courseId], references: [id], onDelete: Cascade)
+}
+
+model QuizAttempt {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  studentId       String   @db.ObjectId
+  uniqueSessionId String
+  moduleId        String?  @db.ObjectId
+  attemptNumber   Int      @default(1)
+  scorePercentage Float // 0 to 100
+  createdAt       DateTime @default(now())
+
+  student User                    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course  CourseNameGenerator     @relation(fields: [uniqueSessionId], references: [uniqueSessionId], onDelete: Cascade)
+  module  CourseLectureGenerator? @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 }
