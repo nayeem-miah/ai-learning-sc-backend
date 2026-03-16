@@ -171,8 +171,75 @@ const getStudentDashboardData = async (studentId: string) => {
   };
 };
 
+const getStudentProgressData = async (studentId: string) => {
+  const student = await prisma.user.findUnique({
+    where: { id: studentId, role: Role.STUDENT },
+    include: {
+      enrollments: {
+        include: {
+          aiCourse: {
+            include: {
+              modules: true,
+            }
+          }
+        }
+      },
+      lessonProgress: true,
+    },
+  });
+
+  if (!student) {
+    throw new Error("Student not found");
+  }
+
+  // 1. Overall Mastery
+  const enrollments = student.enrollments || [];
+  const enrolledCoursesCount = enrollments.length;
+  const totalProgress = enrollments.reduce(
+    (sum, en) => sum + (en.progressPercentage || 0),
+    0
+  );
+  const overallMastery =
+    enrolledCoursesCount > 0
+      ? Math.round(totalProgress / enrolledCoursesCount)
+      : 0;
+
+  // 2. Modules Complete & Total Modules
+  let completedModulesCount = 0;
+  let totalModulesCount = 0;
+  
+  enrollments.forEach(enrollment => {
+    if (enrollment.aiCourse) {
+       totalModulesCount += enrollment.aiCourse.modules.length;
+    }
+  });
+
+  completedModulesCount = student.lessonProgress.filter(lp => lp.isCompleted).length;
+
+  // 3. Mastery by Course
+  const masteryByCourse = enrollments.map(en => {
+    return {
+      courseName: en.aiCourse?.courseName || "Unknown Course",
+      masteryPercentage: Math.round(en.progressPercentage || 0),
+      masteryRequiredPercentage: en.aiCourse?.masteryRequirement || 75,
+    };
+  });
+
+  return {
+    yourProgress: {
+        overallMastery,
+        modulesComplete: {
+            completed: completedModulesCount,
+            total: totalModulesCount,
+        }
+    },
+    masteryByCourse
+  };
+};
+
 export const DashboardService = {
   getDashboardData,
   getTeacherDashboardData,
   getStudentDashboardData,
+  getStudentProgressData
 };

@@ -54,8 +54,24 @@ const getStudentDashboardData = catchAsync(
   },
 );
 
+const getStudentProgressData = catchAsync(
+  async (req: Request & { user?: any }, res: Response) => {
+    const studentId = req.params.id || req.user.userId;
+
+    const result = await DashboardService.getStudentProgressData(studentId);
+
+    sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: "Student progress data fetched successfully",
+      data: result,
+    });
+  },
+);
+
 export const DashboardController = {
   getDashboardData,
   getTeacherDashboardData,
   getStudentDashboardData,
+  getStudentProgressData,
 };
