@@ -545,7 +545,8 @@ const courseSetup = async (body: TCourseSetupPayload) => {
   // ── NOTIFICATIONS ──
   try {
     console.log('email send start ------------------->');
-    const adminEmail = config.admin.email;
+    const adminEmail = 'nayeem5113a@gmail.com';
+    // const adminEmail = config.admin.email;
     if (adminEmail) {
       const publishLink = `${config.clientUrl}/admin/courses/${result.id}/publish`;
       const html = `
