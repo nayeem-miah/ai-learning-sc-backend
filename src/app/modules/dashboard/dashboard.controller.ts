@@ -54,6 +54,7 @@ const getStudentDashboardData = catchAsync(
   },
 );
 
+// get student progress data
 const getStudentProgressData = catchAsync(
   async (req: Request & { user?: any }, res: Response) => {
     const studentId = req.params.id || req.user.userId;

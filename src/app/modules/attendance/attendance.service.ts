@@ -124,6 +124,9 @@ const joinClass = async (
         date: dateOnly,
       },
     },
+    include: {
+      aiCourse: true,
+    },
   });
 
   if (!attendance || !attendance.isActive)
@@ -132,8 +135,8 @@ const joinClass = async (
       "No active class session found for this lesson today",
     );
 
-  // Check if student is even enrolled (though attendance record should exist if they were enrolled at start)
-  const existingRecord = await prisma.attendanceRecord.findUnique({
+  // Check if student is even enrolled
+  let existingRecord = await prisma.attendanceRecord.findUnique({
     where: {
       attendanceId_studentId: {
         attendanceId: attendance.id,
@@ -143,11 +146,47 @@ const joinClass = async (
   });
 
   if (!existingRecord) {
-    // Maybe they enrolled after class started?
-    throw new ApiError(
-      403,
-      "You are not enrolled in this class or record not found",
-    );
+    // Check if the student is enrolled in the course
+    const enrollment = await prisma.enrollment.findFirst({
+      where: {
+        studentId,
+        aiCourseId: courseId,
+      },
+    });
+
+    if (!enrollment) {
+      // If not enrolled, check if they belong to the target grade level of the course
+      const studentProfile = await prisma.studentProfile.findUnique({
+        where: { userId: studentId },
+      });
+
+      if (
+        studentProfile &&
+        studentProfile.gradeLevel === attendance.aiCourse?.targetGradeLevel
+      ) {
+        // Auto-enroll them now
+        await prisma.enrollment.create({
+          data: {
+            studentId,
+            aiCourseId: courseId,
+          },
+        });
+      } else {
+        throw new ApiError(
+          403,
+          "You are not enrolled in this course and do not belong to the target grade level.",
+        );
+      }
+    }
+
+    // Create attendance record since it was missed during startClass
+    existingRecord = await prisma.attendanceRecord.create({
+      data: {
+        attendanceId: attendance.id,
+        studentId,
+        status: "ABSENT",
+      },
+    });
   }
 
   // If already marked as PRESENT or LATE, don't update time

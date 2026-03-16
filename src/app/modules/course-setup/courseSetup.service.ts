@@ -1,9 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import axios, { AxiosError } from 'axios';
 import config from '../../config';
 import ApiError from '../../errors/apiError';
 import { prisma } from '../../prisma/prisma';
+import emailSender from '../../utils/emailSender';
+import { getIo } from '../../utils/socket';
 import { TCourseFromAi, TCourseSetupPayload } from './course.types';
 
 const AI_BASE = config.AI_BASE_API || 'http://206.162.244.135:8000';
@@ -11,7 +14,7 @@ const AI_BASE = config.AI_BASE_API || 'http://206.162.244.135:8000';
 const aiClient = axios.create({
   baseURL: AI_BASE,
   headers: { 'Content-Type': 'application/json' },
-  timeout: 300000,
+  timeout: 600000,
 });
 
 // ── Error helper
@@ -303,7 +306,7 @@ const courseSetup = async (body: TCourseSetupPayload) => {
   }
 
   // PHASE 2 — DB SAVE (only runs if ALL AI steps succeeded)
-  return await prisma.$transaction(
+  const result = await prisma.$transaction(
     async (tx) => {
       // DB SAVE 1: UserId
       await tx.userId.upsert({
@@ -406,10 +409,54 @@ const courseSetup = async (body: TCourseSetupPayload) => {
           });
         }
       }
+
       console.log('enrolllmenert ----------------------1');
+
       // DB SAVE 3: CourseLectureGenerator + QuizQuestion per module
       for (const pair of generatedPairs) {
         const mod = pair.module;
+
+        // -- Restructuring Study Topics to include Voice Data --
+        const audioParts = mod.voice?.audio_parts || [];
+
+        const mappedStudyTopics = (mod.study_topics || []).map(
+          (topic: any, index: number) => {
+            const topicIndex = index + 1;
+
+            // Find audio URLs for this specific topic
+            const nameAudio = audioParts.find(
+              (p: any) => p.part_key === `topic_${topicIndex}_name`,
+            )?.audio_url;
+            const summaryAudio = audioParts.find(
+              (p: any) => p.part_key === `topic_${topicIndex}_summary`,
+            )?.audio_url;
+            const detailAudio = audioParts.find(
+              (p: any) =>
+                p.part_key === `topic_${topicIndex}_detailed_explanation`,
+            )?.audio_url;
+
+            return {
+              ...topic,
+              audio_data: {
+                name_audio_url: nameAudio || null,
+                summary_audio_url: summaryAudio || null,
+                detailed_explanation_audio_url: detailAudio || null,
+              },
+            };
+          },
+        );
+
+        // Extract module level audio
+        const moduleVoiceHeader = {
+          title_audio_url:
+            audioParts.find((p: any) => p.part_key === 'title')?.audio_url ||
+            null,
+          introduction_audio_url:
+            audioParts.find((p: any) => p.part_key === 'introduction')
+              ?.audio_url || null,
+          total_duration: mod.voice?.duration_seconds || 0,
+          voice_id: mod.voice?.voice_id || null,
+        };
 
         // Save module (skip if already exists)
         let savedModule = await tx.courseLectureGenerator.findFirst({
@@ -423,8 +470,8 @@ const courseSetup = async (body: TCourseSetupPayload) => {
               moduleNumber: mod.module_number,
               moduleTitle: mod.title,
               introduction: mod.introduction,
-              studyTopics: mod.study_topics as any,
-              voiceData: mod.voice as any,
+              studyTopics: mappedStudyTopics as any,
+              voiceData: moduleVoiceHeader as any,
             },
           });
         }
@@ -466,6 +513,9 @@ const courseSetup = async (body: TCourseSetupPayload) => {
         }
       }
 
+      // implement socket io
+      // course crate hoye gela notifection patono hobe email and socket io --------- socket a frontend a notifiction patiabo aiCourseRecord.id,  ei id ta patabo email a ekta button thakbe then frontend url a redirect hobe admin/courses/:id/publish  a
+
       return {
         success: true,
         unique_user_id: uniqueUserId,
@@ -491,6 +541,44 @@ const courseSetup = async (body: TCourseSetupPayload) => {
       timeout: 60000,
     },
   );
+
+  // ── NOTIFICATIONS ──
+  try {
+    console.log('email send start ------------------->');
+    const adminEmail = config.admin.email;
+    if (adminEmail) {
+      const publishLink = `${config.clientUrl}/admin/courses/${result.id}/publish`;
+      const html = `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+          <h2 style="color: #4CAF50;">Course Generated Successfully!</h2>
+          <p>The course <strong>"${result.course_title}"</strong> has been generated and is ready for review.</p>
+          <p>Please click the button below to publish the course:</p>
+          <a href="${publishLink}" style="display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">Publish Course</a>
+          <br/><br/>
+          <p>If the button doesn't work, copy and paste this link: <br/> ${publishLink}</p>
+        </div>
+      `;
+      await emailSender('New Course Generated!', adminEmail, html);
+    }
+
+    console.log('email send end ------------------->');
+
+    console.log(result.id, 'result.id');
+
+    // Socket notification
+    console.log('socket notification start ------------------->');
+    const io = getIo();
+    io.emit('course-generated', {
+      message: `Course "${result.course_title}" has been generated!`,
+      courseId: result.id,
+    });
+    console.log('socket notification end ------------------->');
+  } catch (err) {
+    console.error('Notification failed:', err);
+    // We don't throw here to avoid failing the successful course creation
+  }
+
+  return result;
 };
 
 const generateQuiz = async (body: {
@@ -660,7 +748,6 @@ const getAllCourses = async () => {
     },
   });
 
-
   return courses;
 };
 
@@ -706,7 +793,6 @@ const getCourseBySession = async (uniqueSessionId: string) => {
       },
     },
   });
-
 
   if (!course) {
     throw new ApiError(404, `Course not found for session: ${uniqueSessionId}`);
@@ -765,7 +851,9 @@ const submitModuleQuiz = async (
   const submissionResults = await Promise.all(
     body.answers.map(async (ans) => {
       try {
-        const qRecord = module.quizQuestions.find((q) => q.questionId === ans.question_id);
+        const qRecord = module.quizQuestions.find(
+          (q) => q.questionId === ans.question_id,
+        );
         const originalId = qRecord?.originalQuestionId || ans.question_id;
 
         const aiResult = await submitAnswerToAI({
@@ -886,7 +974,6 @@ const completeLesson = async (studentId: string, lessonId: string) => {
     },
   });
 };
-
 
 const getModuleQuizResult = async (query: {
   unique_user_id: string;
@@ -1092,7 +1179,6 @@ const getCourseById = async (id: string) => {
   return { ...courseData, modules: mappedModules };
 };
 
-
 const updateCourse = async (id: string, payload: any) => {
   const isExist = await prisma.courseNameGenerator.findUnique({
     where: { id },
@@ -1236,7 +1322,6 @@ const getStudentPublishedCourses = async (studentId: string) => {
     },
   });
 
-
   const result = await Promise.all(
     courses.map(async (course) => {
       const totalModules = course.totalModules;
@@ -1318,12 +1403,8 @@ const getStudentPublishedCourses = async (studentId: string) => {
     }),
   );
 
-
-
   return result;
 };
-
-
 
 const getTeacherPublishedCourses = async (teacherId: string) => {
   const courses = await prisma.courseNameGenerator.findMany({
@@ -1356,8 +1437,6 @@ const getTeacherPublishedCourses = async (teacherId: string) => {
     };
   });
 };
-
-
 
 const removeTeacherFromCourse = async (courseId: string) => {
   const isExist = await prisma.courseNameGenerator.findUnique({
@@ -1506,7 +1585,6 @@ const getStudentCourseDetails = async (studentId: string, courseId: string) => {
     },
   });
 
-
   if (!course) {
     throw new ApiError(404, 'Course not found');
   }
@@ -1547,7 +1625,13 @@ const getStudentCourseDetails = async (studentId: string, courseId: string) => {
       }
 
       let quizScore = null;
+      let quizResult: any = [];
+      let pointsEarned = 0;
+      let correctAnswersCount = '0/0';
+      let accuracy = 0;
+
       if (aiUserId && hasQuiz) {
+        correctAnswersCount = `0/${mod.quizQuestions.length}`;
         const questionIds = mod.quizQuestions.map((q) => q.questionId);
         const answers = await prisma.quizAnswer.findMany({
           where: {
@@ -1563,13 +1647,36 @@ const getStudentCourseDetails = async (studentId: string, courseId: string) => {
           totalMasteryScore += quizScore;
           modulesWithQuizzesCount++;
           completedAssessmentsCount++;
+
+          pointsEarned = correct * 10; // Assume 10 points per correct answer
+          correctAnswersCount = `${correct}/${mod.quizQuestions.length}`;
+          accuracy = quizScore;
         }
+
+        quizResult = mod.quizQuestions.map((q: any) => {
+          const ans = answers.find((a) => a.questionId === q.questionId);
+          return {
+            questionId: q.questionId,
+            questionText: q.questionText,
+            optionA: q.optionA,
+            optionB: q.optionB,
+            optionC: q.optionC,
+            optionD: q.optionD,
+            selectedAnswer: ans?.selectedAnswer || null,
+            correctAnswer: q.correctAnswer,
+            isCorrect: ans?.isCorrect || false,
+          };
+        });
       }
 
       return {
         ...mod,
         isCompleted,
         quizScore,
+        pointsEarned,
+        correctAnswersCount,
+        accuracy,
+        quizResult,
       };
     }),
   );
@@ -1586,7 +1693,6 @@ const getStudentCourseDetails = async (studentId: string, courseId: string) => {
 
   return {
     ...courseData,
-    quizQuestions: quizzes,
     modules: mappedModules,
     overallProgress: progressPercentage,
     overallMastery,
@@ -1603,10 +1709,10 @@ const getStudentCourseDetails = async (studentId: string, courseId: string) => {
     },
     nextModule: nextModule
       ? {
-        id: nextModule.id,
-        title: nextModule.moduleTitle,
-        moduleNumber: nextModule.moduleNumber,
-      }
+          id: nextModule.id,
+          title: nextModule.moduleTitle,
+          moduleNumber: nextModule.moduleNumber,
+        }
       : null,
   };
 };
@@ -1634,7 +1740,6 @@ const getTeacherCourseDetails = async (teacherId: string, courseId: string) => {
       },
     },
   });
-
 
   if (!course) {
     throw new ApiError(404, 'Course not found');
@@ -1666,13 +1771,14 @@ const getTeacherCourseDetails = async (teacherId: string, courseId: string) => {
         },
       });
 
-      const studentProgress = totalModules > 0 ? (completedModules / totalModules) * 100 : 0;
+      const studentProgress =
+        totalModules > 0 ? (completedModules / totalModules) * 100 : 0;
       totalProgress += studentProgress;
 
       // Mastery is based on QuizAnswer scores
       const profile = await prisma.studentProfile.findUnique({
         where: { userId: studentId },
-        select: { aiUserId: true }
+        select: { aiUserId: true },
       });
       const aiUserId = (profile as any)?.aiUserId;
 
@@ -1681,18 +1787,18 @@ const getTeacherCourseDetails = async (teacherId: string, courseId: string) => {
         let modWithQuizCount = 0;
 
         for (const mod of course.modules) {
-          const questionIds = mod.quizQuestions.map(q => q.questionId);
+          const questionIds = mod.quizQuestions.map((q) => q.questionId);
           if (questionIds.length > 0) {
             const answers = await prisma.quizAnswer.findMany({
               where: {
                 uniqueUserId: aiUserId,
                 uniqueSessionId: course.uniqueSessionId,
-                questionId: { in: questionIds }
-              }
+                questionId: { in: questionIds },
+              },
             });
 
             if (answers.length > 0) {
-              const correct = answers.filter(a => a.isCorrect).length;
+              const correct = answers.filter((a) => a.isCorrect).length;
               studentTotalScore += (correct / answers.length) * 100;
               modWithQuizCount++;
             }
@@ -1700,15 +1806,19 @@ const getTeacherCourseDetails = async (teacherId: string, courseId: string) => {
         }
 
         if (modWithQuizCount > 0) {
-          totalMastery += (studentTotalScore / modWithQuizCount);
+          totalMastery += studentTotalScore / modWithQuizCount;
           studentsWithMastery++;
         }
       }
     }
   }
 
-  const averageProgress = totalStudents > 0 ? Math.round(totalProgress / totalStudents) : 0;
-  const averageMastery = studentsWithMastery > 0 ? Math.round(totalMastery / studentsWithMastery) : 0;
+  const averageProgress =
+    totalStudents > 0 ? Math.round(totalProgress / totalStudents) : 0;
+  const averageMastery =
+    studentsWithMastery > 0
+      ? Math.round(totalMastery / studentsWithMastery)
+      : 0;
 
   // Course structure stats
   let totalLessonsCount = 0;
@@ -1740,6 +1850,152 @@ const getTeacherCourseDetails = async (teacherId: string, courseId: string) => {
   };
 };
 
+const getStudentPublishedCoursesWithResults = async (studentId: string) => {
+  const profile = await prisma.studentProfile.findUnique({
+    where: { userId: studentId },
+  });
+  const aiUserId = (profile as any)?.aiUserId;
+
+  const courses = await prisma.courseNameGenerator.findMany({
+    where: {
+      isPublished: true,
+      enrollments: {
+        some: {
+          studentId,
+        },
+      },
+    },
+    include: {
+      modules: {
+        orderBy: { moduleNumber: 'asc' },
+        include: {
+          lessonProgresses: {
+            where: { studentId },
+          },
+          quizQuestions: {
+            orderBy: { questionNumber: 'asc' },
+          },
+        },
+      },
+      quizzes: {
+        orderBy: { questionNumber: 'asc' },
+      },
+      class: true,
+    },
+  });
+
+  const result = await Promise.all(
+    courses.map(async (course) => {
+      const totalModules = course.totalModules;
+      const completedModules = course.modules.filter(
+        (m) =>
+          m.lessonProgresses.length > 0 && m.lessonProgresses[0].isCompleted,
+      ).length;
+
+      const progressPercentage =
+        totalModules > 0
+          ? Math.round((completedModules / totalModules) * 100)
+          : 0;
+
+      let overallMastery = 0;
+      let modulesWithQuizzesCount = 0;
+      let totalMasteryScore = 0;
+
+      const { quizzes, ...courseData } = course;
+
+      const mappedModules = await Promise.all(
+        course.modules.map(async (mod) => {
+          const isCompleted =
+            mod.lessonProgresses.length > 0 &&
+            mod.lessonProgresses[0].isCompleted;
+
+          // If module-level quizQuestions is empty, try to filter from top-level quizzes
+          let moduleQuizzes = mod.quizQuestions;
+          if (moduleQuizzes.length === 0 && quizzes.length > 0) {
+            moduleQuizzes = quizzes.filter(
+              (q: any) =>
+                q.moduleId === mod.id ||
+                q.questionId.includes(`_MOD${mod.moduleNumber}_`),
+            );
+          }
+
+          let quizScore = null;
+          let quizResult: any = [];
+          let pointsEarned = 0;
+          let correctAnswersCount = '0/0';
+          let accuracy = 0;
+
+          if (aiUserId) {
+            const questionIds = moduleQuizzes.map((q: any) => q.questionId);
+            if (questionIds.length > 0) {
+              correctAnswersCount = `0/${moduleQuizzes.length}`;
+              const answers = await prisma.quizAnswer.findMany({
+                where: {
+                  uniqueUserId: aiUserId,
+                  uniqueSessionId: course.uniqueSessionId,
+                  questionId: { in: questionIds },
+                },
+              });
+
+              if (answers.length > 0) {
+                const correct = answers.filter((a) => a.isCorrect).length;
+                quizScore = Math.round((correct / moduleQuizzes.length) * 100);
+                totalMasteryScore += quizScore;
+                modulesWithQuizzesCount++;
+
+                pointsEarned = correct * 10; // Assume 10 points per correct answer
+                correctAnswersCount = `${correct}/${moduleQuizzes.length}`;
+                accuracy = quizScore;
+              }
+
+              quizResult = moduleQuizzes.map((q: any) => {
+                const ans = answers.find((a) => a.questionId === q.questionId);
+                return {
+                  questionId: q.questionId,
+                  questionText: q.questionText,
+                  optionA: q.optionA,
+                  optionB: q.optionB,
+                  optionC: q.optionC,
+                  optionD: q.optionD,
+                  selectedAnswer: ans?.selectedAnswer || null,
+                  correctAnswer: q.correctAnswer,
+                  isCorrect: ans?.isCorrect || false,
+                };
+              });
+            }
+          }
+
+          return {
+            ...mod,
+            quizQuestions: moduleQuizzes,
+            isCompleted,
+            quizScore,
+            pointsEarned,
+            correctAnswersCount,
+            accuracy,
+            quizResult,
+          };
+        }),
+      );
+
+      if (modulesWithQuizzesCount > 0) {
+        overallMastery = Math.round(
+          totalMasteryScore / modulesWithQuizzesCount,
+        );
+      }
+
+      return {
+        ...courseData,
+        modules: mappedModules,
+        overallProgress: progressPercentage,
+        overallMastery,
+      };
+    }),
+  );
+
+  return result;
+};
+
 export const CourseSetupService = {
   courseSetup,
   generateQuiz,
@@ -1763,8 +2019,5 @@ export const CourseSetupService = {
   completeLesson,
   getStudentCourseDetails,
   getTeacherCourseDetails,
+  getStudentPublishedCoursesWithResults,
 };
-
-
-
-

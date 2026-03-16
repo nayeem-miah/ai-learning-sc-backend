@@ -22,6 +22,12 @@ router.get(
   CourseSetupController.getStudentPublishedCourses,
 );
 
+router.get(
+  '/student/my-published-courses-with-results',
+  auth(Role.STUDENT),
+  CourseSetupController.getStudentPublishedCoursesWithResults,
+);
+
 router.post(
   '/student/complete-lesson',
   auth(Role.STUDENT),
@@ -48,9 +54,9 @@ router.get(
   CourseSetupController.getTeacherCourseDetails,
 );
 
-// router.get('/:id', CourseSetupController.getCourseById);
+router.get('/:id', CourseSetupController.getCourseById);
 
-router.get('/:session_id', CourseSetupController.getCourseBySession);
+// router.get('/:session_id', CourseSetupController.getCourseBySession);
 
 router.patch('/:id', auth(Role.ADMIN), CourseSetupController.updateCourse);
 
