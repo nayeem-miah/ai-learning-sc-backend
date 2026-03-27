@@ -1,3 +1,4 @@
+/* eslint-disable prefer-const */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -51,9 +52,66 @@ const getDashboardData = async (userId: string, role: string) => {
   };
 };
 
+// const getTeacherDashboardData = async (userId: string) => {
+//   const whereClause = { teacherId: userId };
+
+//   const [totalCourses, publishedCourses, draftCourses, recentCourses] =
+//     await Promise.all([
+//       prisma.courseNameGenerator.count({ where: whereClause }),
+//       prisma.courseNameGenerator.count({
+//         where: { ...whereClause, isPublished: true },
+//       }),
+//       prisma.courseNameGenerator.count({
+//         where: { ...whereClause, isPublished: false },
+//       }),
+//       prisma.courseNameGenerator.findMany({
+//         where: whereClause,
+//         orderBy: { createdAt: 'desc' },
+//         take: 5,
+//         include: { class: true },
+//       }),
+//     ]);
+
+//   // Distinct students in teacher's courses
+//   const uniqueStudents = await prisma.enrollment.findMany({
+//     where: { aiCourse: { teacherId: userId } },
+//     distinct: ['studentId'],
+//     select: { studentId: true },
+//   });
+//   const totalStudents = uniqueStudents.length;
+
+//   // Next classes for teacher
+//   const nextClasses = await prisma.courseNameGenerator.findMany({
+//     where: {
+//       teacherId: userId,
+//       isPublished: true,
+//     },
+//     orderBy: {
+//       createdAt: 'desc', // Replace with logic for upcoming date if startDate allows
+//     },
+//     take: 2, // How many "next classes" to display on dashboard
+//     include: {
+//       modules: {
+//         orderBy: { moduleNumber: 'asc' },
+//         take: 1, // Next module to show
+//       },
+//     },
+//   });
+
+//   return {
+//     totalCourses,
+//     publishedCourses,
+//     draftCourses,
+//     totalStudents,
+//     recentCourses,
+//     nextClasses,
+//   };
+// };
+
 const getTeacherDashboardData = async (userId: string) => {
   const whereClause = { teacherId: userId };
 
+  // ✅ Parallel queries
   const [totalCourses, publishedCourses, draftCourses, recentCourses] =
     await Promise.all([
       prisma.courseNameGenerator.count({ where: whereClause }),
@@ -71,7 +129,7 @@ const getTeacherDashboardData = async (userId: string) => {
       }),
     ]);
 
-  // Distinct students in teacher's courses
+  // ✅ Total unique students
   const uniqueStudents = await prisma.enrollment.findMany({
     where: { aiCourse: { teacherId: userId } },
     distinct: ['studentId'],
@@ -79,23 +137,93 @@ const getTeacherDashboardData = async (userId: string) => {
   });
   const totalStudents = uniqueStudents.length;
 
-  // Next classes for teacher
-  const nextClasses = await prisma.courseNameGenerator.findMany({
+  // ✅ Get all published & started courses
+  const courses = await prisma.courseNameGenerator.findMany({
     where: {
       teacherId: userId,
       isPublished: true,
+      startDate: {
+        lte: new Date(),
+      },
     },
-    orderBy: {
-      createdAt: 'desc', // Replace with logic for upcoming date if startDate allows
-    },
-    take: 2, // How many "next classes" to display on dashboard
     include: {
       modules: {
         orderBy: { moduleNumber: 'asc' },
-        take: 1, // Next module to show
       },
     },
   });
+
+  // 🔧 Helper → "09:00 AM" → minutes
+  const convertToMinutes = (time: string) => {
+    const [timePart, modifier] = time.split(' ');
+    let [hours, minutes] = timePart.split(':').map(Number);
+
+    if (modifier === 'PM' && hours !== 12) hours += 12;
+    if (modifier === 'AM' && hours === 12) hours = 0;
+
+    return hours * 60 + minutes;
+  };
+
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  let nextClass: any = null;
+  let upcomingClasses: any[] = [];
+
+  for (const course of courses) {
+    if (!course.startTime || !course.endTime) continue;
+
+    const start = convertToMinutes(course.startTime);
+    const end = convertToMinutes(course.endTime);
+
+    if (!course.startDate) continue;
+
+    const startDate = new Date(course.startDate);
+
+    // 🔥 Calculate module based on days
+    const daysPassed = Math.floor(
+      (now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
+    const moduleIndex = Math.min(
+      Math.max(daysPassed, 0),
+      course.modules.length - 1,
+    );
+
+    const module = course.modules[moduleIndex];
+
+    const classData = {
+      courseId: course.id,
+      courseName: course.generatedCourseName || course.courseName,
+      subject: course.subject,
+      moduleId: module?.id,
+      moduleTitle: module?.moduleTitle,
+      moduleNumber: module?.moduleNumber,
+      startTime: course.startTime,
+      endTime: course.endTime,
+    };
+
+    // ✅ Current running class
+    if (currentMinutes >= start && currentMinutes <= end) {
+      nextClass = { ...classData, type: 'current' };
+      break;
+    }
+
+    // ✅ Upcoming class (today)
+    if (start > currentMinutes) {
+      upcomingClasses.push({
+        ...classData,
+        type: 'upcoming',
+        sortTime: start,
+      });
+    }
+  }
+
+  // ✅ যদি current class না থাকে → nearest upcoming
+  if (!nextClass && upcomingClasses.length > 0) {
+    upcomingClasses.sort((a, b) => a.sortTime - b.sortTime);
+    nextClass = upcomingClasses[0];
+  }
 
   return {
     totalCourses,
@@ -103,7 +231,7 @@ const getTeacherDashboardData = async (userId: string) => {
     draftCourses,
     totalStudents,
     recentCourses,
-    nextClasses,
+    nextClass, // 🔥 final result
   };
 };
 
