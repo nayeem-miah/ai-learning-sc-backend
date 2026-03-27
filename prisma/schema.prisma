@@ -414,8 +414,6 @@ model QuizAnswer {
   question QuizQuestion @relation(fields: [questionId], references: [questionId], onDelete: Cascade)
 }
 
-// -------- FEEDBACK -------- / ---------Notificatio-----------
-
 model Feedback {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   teacherId String   @db.ObjectId
