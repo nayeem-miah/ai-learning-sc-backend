@@ -459,3 +459,15 @@ model QuizAttempt {
   course  CourseNameGenerator     @relation(fields: [uniqueSessionId], references: [uniqueSessionId], onDelete: Cascade)
   module  CourseLectureGenerator? @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 }
+
+model knowledgeFile {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  fileName  String
+  fileUrl   String
+  fileSize  Int
+  fileType  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("knowledge_files")
+}
