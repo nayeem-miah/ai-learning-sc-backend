@@ -7,6 +7,7 @@ import { CourseSetupRoutes } from "../modules/course-setup/courseSetup.route";
 import { DashboardRoutes } from "../modules/dashboard/dashboard.route";
 import { FeedbackRoutes } from "../modules/feedback/feedback.route";
 import { InviteRoutes } from "../modules/invitation/invitation.route";
+import { KnowledgeFileRoutes } from "../modules/knowledgeFile/knowledgeFile.route";
 import { UserRoutes } from "../modules/user/user.route";
 
 const router = Router();
@@ -30,5 +31,6 @@ router.use("/course", CourseSetupRoutes);
 router.use("/quiz", AIQuizRoutes);
 router.use("/dashboard", DashboardRoutes);
 router.use("/feedbacks", FeedbackRoutes);
+router.use("/knowledge-files", KnowledgeFileRoutes);
 
 export default router;
