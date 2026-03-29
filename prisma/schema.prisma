@@ -297,6 +297,9 @@ model CourseNameGenerator {
   courseLength        String
   courseType          String? // Course.courseType (SEMESTER | FULL_YEAR)
 
+  userInstration String?
+  knowledgeBases String[] @default([])
+
   // ── Publishing & Schedule (mirrors Course model)
   isPublished Boolean   @default(false) // Course.isPublished
   startDate   DateTime? // Course.startDate
