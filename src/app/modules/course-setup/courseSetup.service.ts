@@ -339,6 +339,12 @@ const courseSetup = async (body: TCourseSetupPayload) => {
           }),
           ...(body.start_time !== undefined && { startTime: body.start_time }),
           ...(body.end_time !== undefined && { endTime: body.end_time }),
+          ...(body.user_instration !== undefined && {
+            userInstration: body.user_instration,
+          }),
+          ...(body.knowledge_bases !== undefined && {
+            knowledgeBases: body.knowledge_bases,
+          }),
         },
         create: {
           uniqueSessionId,
@@ -366,6 +372,8 @@ const courseSetup = async (body: TCourseSetupPayload) => {
           startDate: body.start_date ? new Date(body.start_date) : undefined,
           startTime: body.start_time,
           endTime: body.end_time,
+          userInstration: body.user_instration,
+          knowledgeBases: body.knowledge_bases || [],
         },
       });
 
@@ -1205,6 +1213,8 @@ const updateCourse = async (id: string, payload: any) => {
     'teacherId',
     'masteryRequirement',
     'totalModules',
+    'userInstration',
+    'knowledgeBases',
   ];
 
   allowedFields.forEach((field) => {

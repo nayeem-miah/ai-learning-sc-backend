@@ -23,6 +23,8 @@ const courseSetup = catchAsync(async (req: Request, res: Response) => {
     mastery_requirement,
     total_modules,
     estimated_duration_min_per_class,
+    user_instration,
+    knowledge_bases,
   } = req.body;
 
   // Validate required fields
@@ -68,6 +70,8 @@ const courseSetup = catchAsync(async (req: Request, res: Response) => {
     mastery_requirement: Number(mastery_requirement),
     total_modules: Number(total_modules),
     estimated_duration_min_per_class: Number(estimated_duration_min_per_class),
+    user_instration,
+    knowledge_bases,
   });
 
   sendResponse(res, {

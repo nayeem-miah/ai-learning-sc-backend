@@ -1,8 +1,10 @@
+import { Role } from '@prisma/client';
 import { Router } from 'express';
-import { KnowledgeFileController } from './knowledgeFile.controller';
+import auth from '../../middlewares/auth';
 import validateRequest from '../../middlewares/validateRequest';
-import { KnowledgeFileValidation } from './knowledgeFile.validation';
 import { fileUpload } from '../../utils/fileUpload';
+import { KnowledgeFileController } from './knowledgeFile.controller';
+import { KnowledgeFileValidation } from './knowledgeFile.validation';
 
 const router = Router();
 
@@ -11,16 +13,22 @@ router.get('/:id', KnowledgeFileController.getSingleKnowledgeFile);
 
 router.post(
   '/',
+  auth(Role.ADMIN),
   fileUpload.upload.single('file'),
   KnowledgeFileController.createKnowledgeFile,
 );
 
 router.patch(
   '/:id',
+  auth(Role.ADMIN),
   validateRequest(KnowledgeFileValidation.updateKnowledgeFileZodSchema),
   KnowledgeFileController.updateKnowledgeFile,
 );
 
-router.delete('/:id', KnowledgeFileController.deleteKnowledgeFile);
+router.delete(
+  '/:id',
+  auth(Role.ADMIN),
+  KnowledgeFileController.deleteKnowledgeFile,
+);
 
 export const KnowledgeFileRoutes = router;

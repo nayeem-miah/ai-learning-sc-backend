@@ -22,6 +22,8 @@ export interface TCourseSetupPayload {
   start_time?: string;
   end_time?: string;
   class_id?: string; // Class MongoDB ObjectId
+  user_instration?: string;
+  knowledge_bases?: string[];
 }
 
 export interface TCourseFromAi {
@@ -41,5 +43,7 @@ export interface TCourseFromAi {
   mastery_requirement: number;
   total_modules: number;
   estimated_duration_min_per_class: number;
+  user_instration?: string;
+  knowledge_bases?: string[];
 }
 
