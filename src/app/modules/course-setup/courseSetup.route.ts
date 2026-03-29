@@ -76,6 +76,10 @@ router.patch(
 
 router.delete('/quiz/:id', auth(Role.ADMIN), CourseSetupController.deleteQuiz);
 
+
+
 router.delete('/:id', auth(Role.ADMIN), CourseSetupController.deleteCourse);
+
+router.get('/module/:id', CourseSetupController.getModuleById);
 
 export const CourseSetupRoutes = router;

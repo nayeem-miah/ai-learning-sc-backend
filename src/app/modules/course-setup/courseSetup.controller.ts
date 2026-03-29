@@ -502,8 +502,55 @@ const getStudentPublishedCoursesWithResults = catchAsync(
   },
 );
 
-export const CourseSetupController = {
 
+const getModuleById = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const result = await CourseSetupService.getModuleById(id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Module fetched successfully',
+    data: result,
+  });
+});
+
+const getQuizzesByIds = catchAsync(async (req: Request, res: Response) => {
+  const { ids } = req.query as { ids: string | string[] };
+
+  if (!ids) {
+    res.status(httpStatus.BAD_REQUEST).json({
+      success: false,
+      message: 'ids query param must be provided',
+    });
+    return;
+  }
+
+  // Handle both comma-separated string and array of strings
+  let idsArray: string[] = [];
+  if (Array.isArray(ids)) {
+    idsArray = ids;
+  } else if (typeof ids === 'string') {
+    idsArray = ids.split(',');
+  }
+
+  if (idsArray.length === 0) {
+    res.status(httpStatus.BAD_REQUEST).json({
+      success: false,
+      message: 'ids must be a non-empty list',
+    });
+    return;
+  }
+
+  const result = await CourseSetupService.getQuizzesByIds(idsArray);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Quizzes fetched successfully',
+    data: result,
+  });
+});
+
+export const CourseSetupController = {
   courseSetup,
   generateQuiz,
   submitQuizAnswer,
@@ -527,4 +574,6 @@ export const CourseSetupController = {
   getStudentCourseDetails,
   getTeacherCourseDetails,
   getStudentPublishedCoursesWithResults,
+  getModuleById,
+  getQuizzesByIds,
 };

@@ -26,7 +26,10 @@ router.get('/module/result', auth(), CourseSetupController.getModuleQuizResult);
 
 router.get(
   '/module/results/public',
+
   CourseSetupController.getModuleQuizResultPublic,
 );
+
+router.get('/by-ids', CourseSetupController.getQuizzesByIds);
 
 export const AIQuizRoutes = router;
