@@ -285,11 +285,75 @@ const getStudentDashboardData = async (studentId: string) => {
   const pendingTasksList: any[] = [];
   const aiUserId = student.studentProfile?.aiUserId;
 
+  const now = new Date();
+
+  // Helper: Create a Date object for today with a specific "HH:MM AM/PM" time
+  const getTimeOnDate = (date: Date, timeStr: string) => {
+    const d = new Date(date);
+    const [timePart, modifier] = timeStr.split(' ');
+    let [hours, minutes] = timePart.split(':').map(Number);
+    if (modifier === 'PM' && hours !== 12) hours += 12;
+    if (modifier === 'AM' && hours === 12) hours = 0;
+    d.setHours(hours, minutes, 0, 0);
+    return d;
+  };
+
+  let potentialNextClasses: any[] = [];
+
   const myCourses = await Promise.all(
     enrollments.map(async (en) => {
       const course = en.aiCourse;
       if (!course) return null;
 
+      // ── TIME-BASED CLASS CALCULATION (for current/next class) ──
+      if (course.startTime && course.endTime && course.startDate) {
+        const courseStartDay = new Date(course.startDate);
+        courseStartDay.setHours(0, 0, 0, 0);
+
+        const todayStart = new Date(now);
+        todayStart.setHours(0, 0, 0, 0);
+
+        const daysSinceStart = Math.floor(
+          (todayStart.getTime() - courseStartDay.getTime()) / (1000 * 60 * 60 * 24),
+        );
+
+        const todayEndTime = getTimeOnDate(now, course.endTime);
+        const todayStartTime = getTimeOnDate(now, course.startTime);
+
+        let targetDate = new Date(todayStart);
+        let targetModuleIndex = daysSinceStart;
+        let type: 'current' | 'upcoming' = 'upcoming';
+
+        if (now < todayEndTime) {
+          targetDate = todayStart;
+          targetModuleIndex = daysSinceStart;
+          if (now >= todayStartTime) type = 'current';
+        } else {
+          targetDate.setDate(targetDate.getDate() + 1);
+          targetModuleIndex = daysSinceStart + 1;
+          type = 'upcoming';
+        }
+
+        if (targetModuleIndex >= 0 && targetModuleIndex < course.modules.length) {
+          const mod = course.modules[targetModuleIndex];
+          const absoluteStart = getTimeOnDate(targetDate, course.startTime);
+
+          potentialNextClasses.push({
+            courseId: course.id,
+            courseName: course.generatedCourseName || course.courseName,
+            subject: course.subject,
+            moduleId: mod?.id,
+            moduleTitle: mod?.moduleTitle,
+            moduleNumber: mod?.moduleNumber,
+            startTime: course.startTime,
+            endTime: course.endTime,
+            absoluteStart,
+            type,
+          });
+        }
+      }
+
+      // ── PROGRESS-BASED CALCULATION (for mastery & pending tasks) ──
       const totalModules = course.totalModules;
       const completedModulesCount = course.modules.filter(
         (m) =>
@@ -341,7 +405,7 @@ const getStudentDashboardData = async (studentId: string) => {
           }
         }
 
-        // Logic for Pending Tasks
+        // Logic for Pending Tasks (Study Progress)
         if (!coursePendingTaskAdded) {
           const isLessonCompleted =
             mod.lessonProgresses.length > 0 &&
@@ -361,7 +425,6 @@ const getStudentDashboardData = async (studentId: string) => {
             });
             coursePendingTaskAdded = true;
           } else if (modQIds.length > 0 && !quizCompleted) {
-            // Lesson is completed but quiz is not
             pendingTasksList.push({
               courseId: course.id,
               courseName: course.generatedCourseName || course.courseName,
@@ -403,11 +466,13 @@ const getStudentDashboardData = async (studentId: string) => {
       ? Math.round(totalMasterySum / coursesWithMastery)
       : 0;
 
-  // Next Class (closest pending lesson)
-  let nextClass = null;
-  if (pendingTasksList.length > 0) {
-    nextClass = pendingTasksList[0];
-  }
+  // ── FINAL SELECTION FOR CURRENT/NEXT CLASS (Time Based) ──
+  const currentClass = potentialNextClasses.find(c => c.type === 'current') || null;
+  const nextScheduledResult = potentialNextClasses
+    .filter(c => c.type === 'upcoming')
+    .sort((a, b) => a.absoluteStart.getTime() - b.absoluteStart.getTime());
+
+  const nextClass = nextScheduledResult.length > 0 ? nextScheduledResult[0] : null;
 
   return {
     studentInfo: {
@@ -420,8 +485,9 @@ const getStudentDashboardData = async (studentId: string) => {
       profilePicture: student.profilePicture,
     },
     overallMastery,
-    nextClass,
-    pendingTasks: pendingTasksList.slice(0, 5), // return up to 5 pending tasks
+    currentClass, // 🔥 Added Current Class
+    nextClass,    // 🔥 Improved Next Scheduled Class
+    pendingTasks: pendingTasksList.slice(0, 5), // Keep study progress
     myCourses: validCourses,
   };
 };
