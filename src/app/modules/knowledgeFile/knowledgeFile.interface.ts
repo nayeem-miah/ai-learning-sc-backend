@@ -3,4 +3,5 @@ export type IKnowledgeFile = {
   fileUrl: string;
   fileSize: number;
   fileType: string;
+  kbId?: string;
 };

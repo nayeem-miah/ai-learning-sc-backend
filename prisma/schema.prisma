@@ -466,6 +466,7 @@ model knowledgeFile {
   fileUrl   String
   fileSize  Int
   fileType  String
+  kbId      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
