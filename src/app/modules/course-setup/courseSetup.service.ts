@@ -8,6 +8,7 @@ import { prisma } from '../../prisma/prisma';
 import emailSender from '../../utils/emailSender';
 import { getIo } from '../../utils/socket';
 import { TCourseFromAi, TCourseSetupPayload } from './course.types';
+import { NotificationType } from '@prisma/client';
 
 const AI_BASE = config.AI_BASE_API || 'http://206.162.244.135:8000';
 
@@ -414,6 +415,22 @@ const courseSetup = async (body: TCourseSetupPayload) => {
         if (enrollmentData.length > 0) {
           await tx.enrollment.createMany({
             data: enrollmentData as any,
+          });
+        }
+
+        // 3. Create Notifications for students
+        const notificationData = matchingStudents.map((student) => ({
+          userId: student.userId,
+          title: body.course_name,
+          message: `Grade ${existingClass.gradeLevel}. ${
+            body.description || ""
+          }. ${body.total_modules} modules.`,
+          type: NotificationType.COURSE,
+        }));
+
+        if (notificationData.length > 0) {
+          await tx.notification.createMany({
+            data: notificationData,
           });
         }
       }

@@ -36,6 +36,8 @@ enum NotificationType {
   REMINDER
   EXAM
   SYSTEM
+  COURSE
+  ATTENDANCE
 }
 
 enum Status {
