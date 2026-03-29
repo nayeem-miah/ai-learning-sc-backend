@@ -1720,10 +1720,10 @@ const getStudentCourseDetails = async (studentId: string, courseId: string) => {
     },
     nextModule: nextModule
       ? {
-          id: nextModule.id,
-          title: nextModule.moduleTitle,
-          moduleNumber: nextModule.moduleNumber,
-        }
+        id: nextModule.id,
+        title: nextModule.moduleTitle,
+        moduleNumber: nextModule.moduleNumber,
+      }
       : null,
   };
 };
@@ -2007,6 +2007,40 @@ const getStudentPublishedCoursesWithResults = async (studentId: string) => {
   return result;
 };
 
+
+// GET SINGLE MODULE BY ID
+const getModuleById = async (id: string) => {
+  const result = await prisma.courseLectureGenerator.findUnique({
+    where: { id },
+    include: {
+      quizQuestions: {
+        orderBy: { questionNumber: 'asc' },
+      },
+      // lessonProgresses: true,
+    },
+  });
+
+  if (!result) {
+    throw new ApiError(404, 'Module not found');
+  }
+
+  return result;
+};
+
+// GET MULTIPLE QUIZZES BY IDS
+const getQuizzesByIds = async (ids: string[]) => {
+  const result = await prisma.quizQuestion.findMany({
+    where: {
+      id: {
+        in: ids,
+      },
+    },
+    orderBy: { questionNumber: 'asc' },
+  });
+
+  return result;
+};
+
 export const CourseSetupService = {
   courseSetup,
   generateQuiz,
@@ -2031,4 +2065,6 @@ export const CourseSetupService = {
   getStudentCourseDetails,
   getTeacherCourseDetails,
   getStudentPublishedCoursesWithResults,
+  getModuleById,
+  getQuizzesByIds,
 };
