@@ -153,46 +153,63 @@ const getTeacherDashboardData = async (userId: string) => {
     },
   });
 
-  // 🔧 Helper → "09:00 AM" → minutes
-  const convertToMinutes = (time: string) => {
-    const [timePart, modifier] = time.split(' ');
-    let [hours, minutes] = timePart.split(':').map(Number);
+  const now = new Date();
 
+  // Helper: Create a Date object for today with a specific "HH:MM AM/PM" time
+  const getTimeOnDate = (date: Date, timeStr: string) => {
+    const d = new Date(date);
+    const [timePart, modifier] = timeStr.split(' ');
+    let [hours, minutes] = timePart.split(':').map(Number);
     if (modifier === 'PM' && hours !== 12) hours += 12;
     if (modifier === 'AM' && hours === 12) hours = 0;
-
-    return hours * 60 + minutes;
+    d.setHours(hours, minutes, 0, 0);
+    return d;
   };
 
-  const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
-  let nextClass: any = null;
-  let upcomingClasses: any[] = [];
+  let potentialNextClasses: any[] = [];
 
   for (const course of courses) {
-    if (!course.startTime || !course.endTime) continue;
+    if (!course.startTime || !course.endTime || !course.startDate) continue;
 
-    const start = convertToMinutes(course.startTime);
-    const end = convertToMinutes(course.endTime);
+    const courseStartDay = new Date(course.startDate);
+    courseStartDay.setHours(0, 0, 0, 0);
 
-    if (!course.startDate) continue;
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
 
-    const startDate = new Date(course.startDate);
-
-    // 🔥 Calculate module based on days
-    const daysPassed = Math.floor(
-      (now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+    // Calculate how many days have passed since course start (excluding time)
+    const daysSinceStart = Math.floor(
+      (todayStart.getTime() - courseStartDay.getTime()) / (1000 * 60 * 60 * 24),
     );
 
-    const moduleIndex = Math.min(
-      Math.max(daysPassed, 0),
-      course.modules.length - 1,
-    );
+    const todayEndTime = getTimeOnDate(now, course.endTime);
+    const todayStartTime = getTimeOnDate(now, course.startTime);
 
-    const module = course.modules[moduleIndex];
+    let targetDate = new Date(todayStart);
+    let targetModuleIndex = daysSinceStart;
+    let type: 'current' | 'upcoming' = 'upcoming';
 
-    const classData = {
+    if (now < todayEndTime) {
+      // Today's class is either running or hasn't started yet
+      targetDate = todayStart;
+      targetModuleIndex = daysSinceStart;
+      if (now >= todayStartTime) {
+        type = 'current';
+      }
+    } else {
+      // Today's class is over, look for tomorrow
+      targetDate.setDate(targetDate.getDate() + 1);
+      targetModuleIndex = daysSinceStart + 1;
+      type = 'upcoming';
+    }
+
+    // Ensure we don't exceed the number of modules
+    if (targetModuleIndex >= course.modules.length) continue;
+
+    const module = course.modules[targetModuleIndex];
+    const absoluteStart = getTimeOnDate(targetDate, course.startTime);
+
+    potentialNextClasses.push({
       courseId: course.id,
       courseName: course.generatedCourseName || course.courseName,
       subject: course.subject,
@@ -201,28 +218,23 @@ const getTeacherDashboardData = async (userId: string) => {
       moduleNumber: module?.moduleNumber,
       startTime: course.startTime,
       endTime: course.endTime,
-    };
-
-    // ✅ Current running class
-    if (currentMinutes >= start && currentMinutes <= end) {
-      nextClass = { ...classData, type: 'current' };
-      break;
-    }
-
-    // ✅ Upcoming class (today)
-    if (start > currentMinutes) {
-      upcomingClasses.push({
-        ...classData,
-        type: 'upcoming',
-        sortTime: start,
-      });
-    }
+      absoluteStart, // Used for sorting
+      type,
+    });
   }
 
-  // ✅ যদি current class না থাকে → nearest upcoming
-  if (!nextClass && upcomingClasses.length > 0) {
-    upcomingClasses.sort((a, b) => a.sortTime - b.sortTime);
-    nextClass = upcomingClasses[0];
+  // Find the truly next class among all courses
+  let nextClass = null;
+  if (potentialNextClasses.length > 0) {
+    // Sort by absolute time (nearest first)
+    // Priority: 'current' classes first, then by time
+    potentialNextClasses.sort((a, b) => {
+      if (a.type === 'current' && b.type !== 'current') return -1;
+      if (a.type !== 'current' && b.type === 'current') return 1;
+      return a.absoluteStart.getTime() - b.absoluteStart.getTime();
+    });
+
+    nextClass = potentialNextClasses[0];
   }
 
   return {
