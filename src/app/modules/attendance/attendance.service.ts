@@ -3,6 +3,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import ApiError from "../../errors/apiError";
 import { prisma } from "../../prisma/prisma";
+import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "@prisma/client";
 
 const startClass = async (
   courseId: string,
@@ -202,7 +204,8 @@ const joinClass = async (
   else if (diff <= 15) status = "LATE";
   else status = "LATE";
 
-  return prisma.attendanceRecord.update({
+
+  const result = await prisma.attendanceRecord.update({
     where: {
       id: existingRecord.id,
     },
@@ -211,14 +214,31 @@ const joinClass = async (
       status,
     },
   });
+
+  if (status === "PRESENT" || status === "LATE") {
+    const student = await prisma.user.findUnique({
+      where: { id: studentId },
+      include: { studentProfile: true },
+    });
+
+    await NotificationService.createNotification({
+      userId: studentId,
+      title: `${student?.firstName} ${student?.lastName}`,
+      message: `Grade ${student?.studentProfile?.gradeLevel || ""}. [Joined]`,
+      type: NotificationType.ATTENDANCE,
+    });
+  }
+
+  return result;
 };
+
 
 const updateAttendanceRecord = async (
   attendanceId: string,
   studentId: string,
   status: "PRESENT" | "LATE" | "ABSENT",
 ) => {
-  return prisma.attendanceRecord.update({
+  const result = await prisma.attendanceRecord.update({
     where: {
       attendanceId_studentId: {
         attendanceId,
@@ -228,7 +248,30 @@ const updateAttendanceRecord = async (
     data: {
       status,
     },
+    include: {
+      attendance: {
+        include: {
+          aiCourse: true,
+        },
+      },
+    },
   });
+
+  if (status === "PRESENT" || status === "LATE") {
+    const student = await prisma.user.findUnique({
+      where: { id: studentId },
+      include: { studentProfile: true },
+    });
+
+    await NotificationService.createNotification({
+      userId: studentId,
+      title: `${student?.firstName} ${student?.lastName}`,
+      message: `Grade ${student?.studentProfile?.gradeLevel || ""}. [Present]`,
+      type: NotificationType.ATTENDANCE,
+    });
+  }
+
+  return result;
 };
 
 const getAttendanceSummary = async (attendanceId: string) => {
@@ -398,7 +441,7 @@ const markJoinedAsPresent = async (attendanceId: string) => {
   if (joinedRecords.length === 0)
     return { message: "No students have joined yet" };
 
-  const updates = joinedRecords.map((record) => {
+  const updates = joinedRecords.map(async (record) => {
     const diff =
       (record.joinTime!.getTime() - attendance.startTime.getTime()) / 60000;
 
@@ -407,10 +450,31 @@ const markJoinedAsPresent = async (attendanceId: string) => {
       status = "LATE";
     }
 
-    return prisma.attendanceRecord.update({
+    const updated = await prisma.attendanceRecord.update({
       where: { id: record.id },
       data: { status },
+      include: {
+        student: {
+          include: {
+            studentProfile: true,
+          },
+        },
+        attendance: { include: { aiCourse: true } },
+      },
     });
+
+    if (status === "PRESENT" || status === "LATE") {
+      await NotificationService.createNotification({
+        userId: record.studentId,
+        title: `${updated.student.firstName} ${updated.student.lastName}`,
+        message: `Grade ${
+          updated.student.studentProfile?.gradeLevel || ""
+        }. [Present]`,
+        type: NotificationType.ATTENDANCE,
+      });
+    }
+
+    return updated;
   });
 
   await Promise.all(updates);
@@ -420,7 +484,21 @@ const markJoinedAsPresent = async (attendanceId: string) => {
 };
 
 const markAllAsPresent = async (attendanceId: string) => {
-  return prisma.attendanceRecord.updateMany({
+  const records = await prisma.attendanceRecord.findMany({
+    where: { attendanceId },
+    include: {
+      student: {
+        include: {
+          studentProfile: true,
+        },
+      },
+      attendance: {
+        include: { aiCourse: true },
+      },
+    },
+  });
+
+  await prisma.attendanceRecord.updateMany({
     where: {
       attendanceId,
     },
@@ -428,6 +506,22 @@ const markAllAsPresent = async (attendanceId: string) => {
       status: "PRESENT",
     },
   });
+
+  // Create notifications
+  const notificationData = records.map((record) => ({
+    userId: record.studentId,
+    title: `${record.student.firstName} ${record.student.lastName}`,
+    message: `Grade ${
+      record.student.studentProfile?.gradeLevel || ""
+    }. [Present]`,
+    type: NotificationType.ATTENDANCE,
+  }));
+
+  if (notificationData.length > 0) {
+    await prisma.notification.createMany({
+      data: notificationData,
+    });
+  }
 };
 
 export const AttendanceService = {

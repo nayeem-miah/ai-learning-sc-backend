@@ -20,7 +20,6 @@ const getDashboardData = catchAsync(
     });
   },
 );
-
 // get teacher all summery
 
 const getTeacherDashboardData = catchAsync(
@@ -37,7 +36,6 @@ const getTeacherDashboardData = catchAsync(
     });
   },
 );
-
 // get student dashboard data
 const getStudentDashboardData = catchAsync(
   async (req: Request & { user?: any }, res: Response) => {
@@ -53,7 +51,6 @@ const getStudentDashboardData = catchAsync(
     });
   },
 );
-
 // get student progress data
 const getStudentProgressData = catchAsync(
   async (req: Request & { user?: any }, res: Response) => {
