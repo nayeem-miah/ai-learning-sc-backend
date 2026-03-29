@@ -204,7 +204,6 @@ const joinClass = async (
   else if (diff <= 15) status = "LATE";
   else status = "LATE";
 
-
   const result = await prisma.attendanceRecord.update({
     where: {
       id: existingRecord.id,
@@ -215,23 +214,8 @@ const joinClass = async (
     },
   });
 
-  if (status === "PRESENT" || status === "LATE") {
-    const student = await prisma.user.findUnique({
-      where: { id: studentId },
-      include: { studentProfile: true },
-    });
-
-    await NotificationService.createNotification({
-      userId: studentId,
-      title: `${student?.firstName} ${student?.lastName}`,
-      message: `Grade ${student?.studentProfile?.gradeLevel || ""}. [Joined]`,
-      type: NotificationType.ATTENDANCE,
-    });
-  }
-
   return result;
 };
-
 
 const updateAttendanceRecord = async (
   attendanceId: string,
@@ -266,7 +250,7 @@ const updateAttendanceRecord = async (
     await NotificationService.createNotification({
       userId: studentId,
       title: `${student?.firstName} ${student?.lastName}`,
-      message: `Grade ${student?.studentProfile?.gradeLevel || ""}. [Present]`,
+      message: `${student?.studentProfile?.gradeLevel || ""}. [Present]`,
       type: NotificationType.ATTENDANCE,
     });
   }
@@ -467,9 +451,7 @@ const markJoinedAsPresent = async (attendanceId: string) => {
       await NotificationService.createNotification({
         userId: record.studentId,
         title: `${updated.student.firstName} ${updated.student.lastName}`,
-        message: `Grade ${
-          updated.student.studentProfile?.gradeLevel || ""
-        }. [Present]`,
+        message: `${updated.student.studentProfile?.gradeLevel || ""}. [Present]`,
         type: NotificationType.ATTENDANCE,
       });
     }
@@ -511,9 +493,7 @@ const markAllAsPresent = async (attendanceId: string) => {
   const notificationData = records.map((record) => ({
     userId: record.studentId,
     title: `${record.student.firstName} ${record.student.lastName}`,
-    message: `Grade ${
-      record.student.studentProfile?.gradeLevel || ""
-    }. [Present]`,
+    message: `${record.student.studentProfile?.gradeLevel || ""}. [Present]`,
     type: NotificationType.ATTENDANCE,
   }));
 

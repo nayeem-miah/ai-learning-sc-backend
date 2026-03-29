@@ -13,17 +13,9 @@ const createNotification = async (data: {
 };
 
 const getMyNotifications = async (userId: string) => {
-  const notifications = await prisma.notification.findMany({
+  return await prisma.notification.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
-  });
-
-  // Only show ATTENDANCE notifications that are teacher-driven ([Present])
-  return notifications.filter((notification) => {
-    if (notification.type === NotificationType.ATTENDANCE) {
-      return notification.message.includes("[Present]");
-    }
-    return true;
   });
 };
 
