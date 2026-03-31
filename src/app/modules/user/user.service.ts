@@ -605,6 +605,14 @@ const getStudentManagementData = async (
           status: true,
         },
       },
+      lessonProgress: {
+        where: {
+          isCompleted: true,
+        },
+        select: {
+          id: true,
+        },
+      },
     },
   });
 
@@ -614,9 +622,11 @@ const getStudentManagementData = async (
   let totalAttendanceRecords = 0;
 
   allFilteredStudents.forEach((student) => {
-    const hasActivity = student.enrollments.some(
-      (e) => e.progressPercentage > 0,
-    );
+    // A student is engaged if they have lesson progress OR enrollment progress > 0
+    const hasActivity =
+      student.lessonProgress.length > 0 ||
+      student.enrollments.some((e) => (e.progressPercentage || 0) > 0);
+
     if (hasActivity) {
       engagedCount++;
     } else {
