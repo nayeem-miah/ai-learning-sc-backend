@@ -197,14 +197,12 @@ const getTeacherDashboardData = async (userId: string) => {
         type = 'current';
       }
     } else {
-      // Today's class is over, look for tomorrow
-      targetDate.setDate(targetDate.getDate() + 1);
-      targetModuleIndex = daysSinceStart + 1;
-      type = 'upcoming';
+      // Today's class is over. User only wants to see today's classes, so don't show tomorrow's.
+      continue;
     }
 
-    // Ensure we don't exceed the number of modules
-    if (targetModuleIndex >= course.modules.length) continue;
+    // Ensure we don't exceed the number of modules and handle if course hasn't started
+    if (targetModuleIndex < 0 || targetModuleIndex >= course.modules.length) continue;
 
     const module = course.modules[targetModuleIndex];
     const absoluteStart = getTimeOnDate(targetDate, course.startTime);
@@ -301,53 +299,47 @@ const getStudentDashboardData = async (studentId: string) => {
       const course = en.aiCourse;
       if (!course) return null;
 
-      // ── TIME-BASED CLASS CALCULATION (for current/next class) ──
-      if (course.startTime && course.endTime && course.startDate) {
-        const courseStartDay = new Date(course.startDate);
-        courseStartDay.setHours(0, 0, 0, 0);
-
-        const todayStart = new Date(now);
-        todayStart.setHours(0, 0, 0, 0);
-
-        const daysSinceStart = Math.floor(
-          (todayStart.getTime() - courseStartDay.getTime()) / (1000 * 60 * 60 * 24),
-        );
-
-        const todayEndTime = getTimeOnDate(now, course.endTime);
-        const todayStartTime = getTimeOnDate(now, course.startTime);
-
-        let targetDate = new Date(todayStart);
-        let targetModuleIndex = daysSinceStart;
+        let targetModuleIndex = -1;
         let type: 'current' | 'upcoming' = 'upcoming';
 
-        if (now < todayEndTime) {
-          targetDate = todayStart;
-          targetModuleIndex = daysSinceStart;
-          if (now >= todayStartTime) type = 'current';
-        } else {
-          targetDate.setDate(targetDate.getDate() + 1);
-          targetModuleIndex = daysSinceStart + 1;
-          type = 'upcoming';
-        }
+        if (course.startTime && course.endTime && course.startDate) {
+          const courseStartDay = new Date(course.startDate);
+          courseStartDay.setHours(0, 0, 0, 0);
 
-        if (targetModuleIndex >= 0 && targetModuleIndex < course.modules.length) {
-          const mod = course.modules[targetModuleIndex];
-          const absoluteStart = getTimeOnDate(targetDate, course.startTime);
+          const todayStart = new Date(now);
+          todayStart.setHours(0, 0, 0, 0);
 
-          potentialNextClasses.push({
-            courseId: course.id,
-            courseName: course.generatedCourseName || course.courseName,
-            subject: course.subject,
-            moduleId: mod?.id,
-            moduleTitle: mod?.moduleTitle,
-            moduleNumber: mod?.moduleNumber,
-            startTime: course.startTime,
-            endTime: course.endTime,
-            absoluteStart,
-            type,
-          });
+          const daysSinceStart = Math.floor(
+            (todayStart.getTime() - courseStartDay.getTime()) / (1000 * 60 * 60 * 24),
+          );
+
+          const todayEndTime = getTimeOnDate(now, course.endTime);
+          const todayStartTime = getTimeOnDate(now, course.startTime);
+
+          if (now < todayEndTime) {
+            // Today's class is either running or hasn't started yet
+            targetModuleIndex = daysSinceStart;
+            if (now >= todayStartTime) type = 'current';
+
+            if (targetModuleIndex >= 0 && targetModuleIndex < course.modules.length) {
+              const mod = course.modules[targetModuleIndex];
+              const absoluteStart = getTimeOnDate(todayStart, course.startTime);
+
+              potentialNextClasses.push({
+                courseId: course.id,
+                courseName: course.generatedCourseName || course.courseName,
+                subject: course.subject,
+                moduleId: mod?.id,
+                moduleTitle: mod?.moduleTitle,
+                moduleNumber: mod?.moduleNumber,
+                startTime: course.startTime,
+                endTime: course.endTime,
+                absoluteStart,
+                type,
+              });
+            }
+          }
         }
-      }
 
       // ── PROGRESS-BASED CALCULATION (for mastery & pending tasks) ──
       const totalModules = course.totalModules;
