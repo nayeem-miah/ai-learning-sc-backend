@@ -467,12 +467,12 @@ const getStudentDashboardData = async (studentId: string) => {
       : 0;
 
   // ── FINAL SELECTION FOR CURRENT/NEXT CLASS (Time Based) ──
-  const currentClass = potentialNextClasses.find(c => c.type === 'current') || null;
-  const nextScheduledResult = potentialNextClasses
-    .filter(c => c.type === 'upcoming')
-    .sort((a, b) => a.absoluteStart.getTime() - b.absoluteStart.getTime());
+  // Sort all potential classes by absolute time (nearest first)
+  const sortedClasses = potentialNextClasses.sort(
+    (a, b) => a.absoluteStart.getTime() - b.absoluteStart.getTime(),
+  );
 
-  const nextClass = nextScheduledResult.length > 0 ? nextScheduledResult[0] : null;
+  const nextClass = sortedClasses.length > 0 ? sortedClasses[0] : null;
 
   return {
     studentInfo: {
@@ -485,8 +485,7 @@ const getStudentDashboardData = async (studentId: string) => {
       profilePicture: student.profilePicture,
     },
     overallMastery,
-    currentClass, // 🔥 Added Current Class
-    nextClass,    // 🔥 Improved Next Scheduled Class
+    nextClass,    // 🔥 Prioritized current or next class 
     pendingTasks: pendingTasksList.slice(0, 5), // Keep study progress
     myCourses: validCourses,
   };
