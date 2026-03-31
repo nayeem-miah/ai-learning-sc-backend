@@ -949,17 +949,10 @@ const submitModuleQuiz = async (
   });
 
   return {
-    success: true,
-    unique_user_id: body.unique_user_id,
-    unique_session_id: body.unique_session_id,
-    module_id: body.module_id,
-    module_number: module.moduleNumber,
-    module_title: module.moduleTitle,
     total_questions: totalQuestions,
     correct_answers: correctCount,
     wrong_answers: wrongCount,
     score_percentage: scorePercentage,
-    details: submissionResults,
   };
 };
 
@@ -989,13 +982,14 @@ const getModuleQuizResult = async (query: {
   unique_session_id: string;
   module_id: string;
 }) => {
-  // Find the module
   const module = await prisma.courseLectureGenerator.findFirst({
     where: {
       id: query.module_id,
       uniqueSessionId: query.unique_session_id,
     },
-    include: { quizQuestions: true },
+    include: {
+      quizQuestions: true,
+    },
   });
 
   if (!module) {
