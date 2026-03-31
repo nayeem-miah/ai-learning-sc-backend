@@ -227,12 +227,8 @@ const getTeacherDashboardData = async (userId: string) => {
   let nextClass = null;
   if (potentialNextClasses.length > 0) {
     // Sort by absolute time (nearest first)
-    // Priority: 'current' classes first, then by time
-    potentialNextClasses.sort((a, b) => {
-      if (a.type === 'current' && b.type !== 'current') return -1;
-      if (a.type !== 'current' && b.type === 'current') return 1;
-      return a.absoluteStart.getTime() - b.absoluteStart.getTime();
-    });
+    // Naturally priorities 'current' (past) classes then 'upcoming' (future)
+    potentialNextClasses.sort((a, b) => a.absoluteStart.getTime() - b.absoluteStart.getTime());
 
     nextClass = potentialNextClasses[0];
   }
