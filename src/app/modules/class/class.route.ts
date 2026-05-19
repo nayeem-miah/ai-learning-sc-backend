@@ -7,17 +7,17 @@ import { ClassValidation } from "./class.validation";
 
 const router = Router();
 
+router.get(
+  "/",
+  // auth(Role.ADMIN, Role.TEACHER, Role.STUDENT),
+  ClassController.getAllClasses,
+);
+
 router.post(
   "/",
   auth(Role.ADMIN),
   validateRequest(ClassValidation.createClassSchema),
   ClassController.createClass,
-);
-
-router.get(
-  "/",
-  // auth(Role.ADMIN, Role.TEACHER, Role.STUDENT),
-  ClassController.getAllClasses,
 );
 
 router.delete(

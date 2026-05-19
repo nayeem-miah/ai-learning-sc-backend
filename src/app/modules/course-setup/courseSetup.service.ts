@@ -1,20 +1,21 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import axios, { AxiosError } from 'axios';
-import config from '../../config';
-import ApiError from '../../errors/apiError';
-import { prisma } from '../../prisma/prisma';
-import emailSender from '../../utils/emailSender';
-import { getIo } from '../../utils/socket';
-import { TCourseFromAi, TCourseSetupPayload } from './course.types';
-import { NotificationType } from '@prisma/client';
+import axios, { AxiosError } from "axios";
+import config from "../../config";
+import ApiError from "../../errors/apiError";
+import { prisma } from "../../prisma/prisma";
+import emailSender from "../../utils/emailSender";
+import { getIo } from "../../utils/socket";
+import { TCourseFromAi, TCourseSetupPayload } from "./course.types";
+import { NotificationType } from "@prisma/client";
 
-const AI_BASE = config.AI_BASE_API || 'http://206.162.244.135:8000';
+const AI_BASE =
+  config.AI_BASE_API || "https://scottfriedman12-ai.aiteamtwo.com";
 
 const aiClient = axios.create({
   baseURL: AI_BASE,
-  headers: { 'Content-Type': 'application/json' },
+  headers: { "Content-Type": "application/json" },
   timeout: 600000,
 });
 
@@ -37,11 +38,11 @@ const generateUserIdFromAI = async (): Promise<{
   created_at: string;
   is_active: boolean;
 }> => {
-  const response = await aiClient.post('/api/v1/user-id/generate');
+  const response = await aiClient.post("/api/v1/user-id/generate");
 
   const data = response.data?.data;
   if (!data?.user_id) {
-    throw new ApiError(502, 'AI did not return a valid user_id');
+    throw new ApiError(502, "AI did not return a valid user_id");
   }
 
   return {
@@ -60,13 +61,13 @@ const generateCourseFromAI = async (
   unique_id: string;
   data: any;
 }> => {
-  const response = await aiClient.post('/api/v1/course/generate', payload);
+  const response = await aiClient.post("/api/v1/course/generate", payload);
 
   const result = response.data;
   if (!result?.unique_session_id) {
     throw new ApiError(
       502,
-      'AI did not return a valid unique_session_id from course generate',
+      "AI did not return a valid unique_session_id from course generate",
     );
   }
 
@@ -90,7 +91,7 @@ const generateModuleFromAI = async (
   total_modules: number;
 }> => {
   const response = await aiClient.post(
-    '/api/v1/course-lecture/generate-module',
+    "/api/v1/course-lecture/generate-module",
     payload,
   );
 
@@ -100,7 +101,7 @@ const generateModuleFromAI = async (
   return {
     module_number: module?.module_number ?? payload.module_number,
     title: module?.title ?? `Module ${payload.module_number}`,
-    introduction: module?.introduction ?? '',
+    introduction: module?.introduction ?? "",
     study_topics: module?.study_topics ?? [],
     voice: module?.voice ?? null,
     total_modules: result?.total_modules ?? 0,
@@ -120,11 +121,11 @@ const generateQuizFromAI = async (
   }[];
   total_questions: number;
 }> => {
-  const response = await aiClient.post('/api/v1/quiz/generate', payload);
+  const response = await aiClient.post("/api/v1/quiz/generate", payload);
 
   const result = response.data;
   if (!result?.quiz_questions) {
-    throw new ApiError(502, 'AI did not return valid quiz questions');
+    throw new ApiError(502, "AI did not return valid quiz questions");
   }
 
   return {
@@ -146,15 +147,15 @@ const submitAnswerToAI = async (payload: {
   correct_answer: string;
   message: string;
 }> => {
-  console.log('----------------------- calling ai apis', payload);
-  const response = await aiClient.post('/api/v1/quiz/submit-answer', payload);
+  console.log("----------------------- calling ai apis", payload);
+  const response = await aiClient.post("/api/v1/quiz/submit-answer", payload);
   console.log(response.data);
   const result = response.data;
   return {
     success: result.success ?? true,
     is_correct: result.is_correct,
     correct_answer: result.correct_answer,
-    message: result.message ?? 'Answer submitted',
+    message: result.message ?? "Answer submitted",
   };
 };
 
@@ -186,7 +187,7 @@ const courseSetup = async (body: TCourseSetupPayload) => {
   });
 
   if (!existingClass) {
-    throw new ApiError(404, 'Class not found');
+    throw new ApiError(404, "Class not found");
   }
 
   // ── AI Step 1: Generate User ID
@@ -196,7 +197,7 @@ const courseSetup = async (body: TCourseSetupPayload) => {
   } catch (err) {
     throw new ApiError(
       502,
-      `[Step 1] Failed to generate User ID from AI: ${getAIError(err, 'Unknown error')}`,
+      `[Step 1] Failed to generate User ID from AI: ${getAIError(err, "Unknown error")}`,
     );
   }
   const uniqueUserId = userResult.user_id;
@@ -217,7 +218,7 @@ const courseSetup = async (body: TCourseSetupPayload) => {
   } catch (err) {
     throw new ApiError(
       502,
-      `[Step 2] Failed to generate Course from AI: ${getAIError(err, 'Unknown error')}`,
+      `[Step 2] Failed to generate Course from AI: ${getAIError(err, "Unknown error")}`,
     );
   }
   const uniqueSessionId = courseResult.unique_session_id;
@@ -258,11 +259,11 @@ const courseSetup = async (body: TCourseSetupPayload) => {
         target_grade_level: existingClass.gradeLevel,
       });
 
-      console.log('generated module ----------------------', i);
+      console.log("generated module ----------------------", i);
     } catch (err) {
       throw new ApiError(
         502,
-        `[Step 3] Module ${i}/${totalModules} generation failed: ${getAIError(err, 'Unknown error')}. No data was saved to the database. Please retry.`,
+        `[Step 3] Module ${i}/${totalModules} generation failed: ${getAIError(err, "Unknown error")}. No data was saved to the database. Please retry.`,
       );
     }
 
@@ -288,7 +289,7 @@ const courseSetup = async (body: TCourseSetupPayload) => {
     } catch (err) {
       throw new ApiError(
         502,
-        `[Step 3] Quiz generation for Module ${i}/${totalModules} failed: ${getAIError(err, 'Unknown error')}. No data was saved to the database. Please retry.`,
+        `[Step 3] Quiz generation for Module ${i}/${totalModules} failed: ${getAIError(err, "Unknown error")}. No data was saved to the database. Please retry.`,
       );
     }
 
@@ -319,7 +320,7 @@ const courseSetup = async (body: TCourseSetupPayload) => {
         },
       });
 
-      console.log('data insart start------------------------------');
+      console.log("data insart start------------------------------");
 
       // DB SAVE 2: CourseNameGenerator
       const aiCourseRecord = await tx.courseNameGenerator.upsert({
@@ -402,7 +403,7 @@ const courseSetup = async (body: TCourseSetupPayload) => {
           existingEnrollments.map((e) => e.studentId),
         );
 
-        console.log('enrollemnt -----------------------0');
+        console.log("enrollemnt -----------------------0");
         // 2. Only enroll those who are NOT already enrolled
         const enrollmentData = matchingStudents
           .filter((student) => !existingStudentIds.has(student.userId))
@@ -435,7 +436,7 @@ const courseSetup = async (body: TCourseSetupPayload) => {
         }
       }
 
-      console.log('enrolllmenert ----------------------1');
+      console.log("enrolllmenert ----------------------1");
 
       // DB SAVE 3: CourseLectureGenerator + QuizQuestion per module
       for (const pair of generatedPairs) {
@@ -474,10 +475,10 @@ const courseSetup = async (body: TCourseSetupPayload) => {
         // Extract module level audio
         const moduleVoiceHeader = {
           title_audio_url:
-            audioParts.find((p: any) => p.part_key === 'title')?.audio_url ||
+            audioParts.find((p: any) => p.part_key === "title")?.audio_url ||
             null,
           introduction_audio_url:
-            audioParts.find((p: any) => p.part_key === 'introduction')
+            audioParts.find((p: any) => p.part_key === "introduction")
               ?.audio_url || null,
           total_duration: mod.voice?.duration_seconds || 0,
           voice_id: mod.voice?.voice_id || null,
@@ -517,7 +518,7 @@ const courseSetup = async (body: TCourseSetupPayload) => {
                 update: {
                   questionText: q.question_text,
                   moduleId: savedModule!.id,
-                  correctAnswer: 'PENDING',
+                  correctAnswer: "PENDING",
                 },
                 create: {
                   questionId: uniqueQuestionKey,
@@ -526,11 +527,11 @@ const courseSetup = async (body: TCourseSetupPayload) => {
                   moduleId: savedModule!.id,
                   questionNumber: q.question_number,
                   questionText: q.question_text,
-                  optionA: getOpt('A'),
-                  optionB: getOpt('B'),
-                  optionC: getOpt('C'),
-                  optionD: getOpt('D'),
-                  correctAnswer: 'PENDING',
+                  optionA: getOpt("A"),
+                  optionB: getOpt("B"),
+                  optionC: getOpt("C"),
+                  optionD: getOpt("D"),
+                  correctAnswer: "PENDING",
                 },
               });
             }),
@@ -569,8 +570,8 @@ const courseSetup = async (body: TCourseSetupPayload) => {
 
   // ── NOTIFICATIONS ──
   try {
-    console.log('email send start ------------------->');
-    const adminEmail = 'nayeem5113a@gmail.com';
+    console.log("email send start ------------------->");
+    const adminEmail = "nayeem5113a@gmail.com";
     // const adminEmail = config.admin.email;
     if (adminEmail) {
       const publishLink = `${config.clientUrl}/admin/courses/${result.id}/publish`;
@@ -584,23 +585,23 @@ const courseSetup = async (body: TCourseSetupPayload) => {
           <p>If the button doesn't work, copy and paste this link: <br/> ${publishLink}</p>
         </div>
       `;
-      await emailSender('New Course Generated!', adminEmail, html);
+      await emailSender("New Course Generated!", adminEmail, html);
     }
 
-    console.log('email send end ------------------->');
+    console.log("email send end ------------------->");
 
-    console.log(result.id, 'result.id');
+    console.log(result.id, "result.id");
 
     // Socket notification
-    console.log('socket notification start ------------------->');
+    console.log("socket notification start ------------------->");
     const io = getIo();
-    io.emit('course-generated', {
+    io.emit("course-generated", {
       message: `Course "${result.course_title}" has been generated!`,
       courseId: result.id,
     });
-    console.log('socket notification end ------------------->');
+    console.log("socket notification end ------------------->");
   } catch (err) {
-    console.error('Notification failed:', err);
+    console.error("Notification failed:", err);
     // We don't throw here to avoid failing the successful course creation
   }
 
@@ -635,11 +636,11 @@ const generateQuiz = async (body: {
           moduleId: null, // General quizzes might not have a module link initially
           questionNumber: q.question_number,
           questionText: q.question_text,
-          optionA: getOpt('A'),
-          optionB: getOpt('B'),
-          optionC: getOpt('C'),
-          optionD: getOpt('D'),
-          correctAnswer: 'PENDING',
+          optionA: getOpt("A"),
+          optionB: getOpt("B"),
+          optionC: getOpt("C"),
+          optionD: getOpt("D"),
+          correctAnswer: "PENDING",
         };
         return prisma.quizQuestion.upsert({
           where: { questionId: q.question_id },
@@ -656,7 +657,7 @@ const generateQuiz = async (body: {
   } catch (err) {
     throw new ApiError(
       502,
-      `Failed to generate quiz from AI: ${getAIError(err, 'Unknown error')}`,
+      `Failed to generate quiz from AI: ${getAIError(err, "Unknown error")}`,
     );
   }
 };
@@ -712,7 +713,7 @@ const submitQuizAnswer = async (body: {
   } catch (err) {
     throw new ApiError(
       502,
-      `Failed to submit answer to AI: ${getAIError(err, 'Unknown error')}`,
+      `Failed to submit answer to AI: ${getAIError(err, "Unknown error")}`,
     );
   }
 };
@@ -726,7 +727,7 @@ const getQuizResults = async (body: {
   } catch (err) {
     throw new ApiError(
       502,
-      `Failed to get quiz results from AI: ${getAIError(err, 'Unknown error')}`,
+      `Failed to get quiz results from AI: ${getAIError(err, "Unknown error")}`,
     );
   }
 };
@@ -734,7 +735,7 @@ const getQuizResults = async (body: {
 // GET ALL COURSES — modules with their quiz questions nested inside
 const getAllCourses = async () => {
   const courses = await prisma.courseNameGenerator.findMany({
-    orderBy: { createdAt: 'desc' },
+    orderBy: { createdAt: "desc" },
     include: {
       user: {
         select: { userId: true, isActive: true },
@@ -742,7 +743,7 @@ const getAllCourses = async () => {
       class: true,
 
       modules: {
-        orderBy: { moduleNumber: 'asc' },
+        orderBy: { moduleNumber: "asc" },
         select: {
           id: true,
           moduleNumber: true,
@@ -753,7 +754,7 @@ const getAllCourses = async () => {
           createdAt: true,
           // Quiz questions linked to THIS module via moduleId
           quizQuestions: {
-            orderBy: { questionNumber: 'asc' },
+            orderBy: { questionNumber: "asc" },
             select: {
               id: true,
               questionId: true,
@@ -769,7 +770,7 @@ const getAllCourses = async () => {
         },
       },
       quizzes: {
-        orderBy: { questionNumber: 'asc' },
+        orderBy: { questionNumber: "asc" },
       },
     },
   });
@@ -788,7 +789,7 @@ const getCourseBySession = async (uniqueSessionId: string) => {
       class: true, // Added to show class details
 
       modules: {
-        orderBy: { moduleNumber: 'asc' },
+        orderBy: { moduleNumber: "asc" },
         select: {
           id: true,
           moduleNumber: true,
@@ -798,7 +799,7 @@ const getCourseBySession = async (uniqueSessionId: string) => {
           voiceData: true,
           createdAt: true,
           quizQuestions: {
-            orderBy: { questionNumber: 'asc' },
+            orderBy: { questionNumber: "asc" },
             select: {
               id: true,
               questionId: true,
@@ -815,7 +816,7 @@ const getCourseBySession = async (uniqueSessionId: string) => {
         },
       },
       quizzes: {
-        orderBy: { questionNumber: 'asc' },
+        orderBy: { questionNumber: "asc" },
       },
     },
   });
@@ -904,7 +905,7 @@ const submitModuleQuiz = async (
       } catch (err) {
         throw new ApiError(
           502,
-          `Failed to submit answer for question ${ans.question_id}: ${getAIError(err, 'Unknown error')}`,
+          `Failed to submit answer for question ${ans.question_id}: ${getAIError(err, "Unknown error")}`,
         );
       }
     }),
@@ -1024,7 +1025,7 @@ const getModuleQuizResult = async (query: {
       uniqueSessionId: query.unique_session_id,
       questionId: { in: moduleQuestionIds },
     },
-    orderBy: { submittedAt: 'asc' },
+    orderBy: { submittedAt: "asc" },
   });
 
   if (answers.length === 0) {
@@ -1054,12 +1055,12 @@ const getModuleQuizResult = async (query: {
       );
       return {
         question_id: a.questionId,
-        question_text: q?.questionText || '',
+        question_text: q?.questionText || "",
         options: {
-          A: q?.optionA || '',
-          B: q?.optionB || '',
-          C: q?.optionC || '',
-          D: q?.optionD || '',
+          A: q?.optionA || "",
+          B: q?.optionB || "",
+          C: q?.optionC || "",
+          D: q?.optionD || "",
         },
         selected_answer: a.selectedAnswer,
         correct_answer: a.correctAnswer,
@@ -1098,7 +1099,7 @@ const getModuleQuizResultPublic = async (query: {
 
   const allAnswers = await prisma.quizAnswer.findMany({
     where: whereClause,
-    orderBy: { submittedAt: 'desc' },
+    orderBy: { submittedAt: "desc" },
   });
 
   // Group by uniqueUserId
@@ -1157,22 +1158,22 @@ const getCourseById = async (id: string) => {
       },
       class: true,
       modules: {
-        orderBy: { moduleNumber: 'asc' },
+        orderBy: { moduleNumber: "asc" },
         include: {
           quizQuestions: {
-            orderBy: { questionNumber: 'asc' },
+            orderBy: { questionNumber: "asc" },
           },
           lessonProgresses: true,
         },
       },
       quizzes: {
-        orderBy: { questionNumber: 'asc' },
+        orderBy: { questionNumber: "asc" },
       },
     },
   });
 
   if (!course) {
-    throw new ApiError(404, 'Course not found');
+    throw new ApiError(404, "Course not found");
   }
 
   const { quizzes, ...courseData } = course;
@@ -1205,27 +1206,27 @@ const updateCourse = async (id: string, payload: any) => {
   });
 
   if (!isExist) {
-    throw new ApiError(404, 'Course not found');
+    throw new ApiError(404, "Course not found");
   }
 
   // Sanitize payload to only allowed fields
   const updateData: any = {};
   const allowedFields = [
-    'courseName',
-    'subject',
-    'description',
-    'isPublished',
-    'startDate',
-    'startTime',
-    'endTime',
-    'targetGradeLevel',
-    'courseLength',
-    'semesterCount',
-    'teacherId',
-    'masteryRequirement',
-    'totalModules',
-    'userInstration',
-    'knowledgeBases',
+    "courseName",
+    "subject",
+    "description",
+    "isPublished",
+    "startDate",
+    "startTime",
+    "endTime",
+    "targetGradeLevel",
+    "courseLength",
+    "semesterCount",
+    "teacherId",
+    "masteryRequirement",
+    "totalModules",
+    "userInstration",
+    "knowledgeBases",
   ];
 
   allowedFields.forEach((field) => {
@@ -1246,7 +1247,7 @@ const updateLesson = async (id: string, payload: any) => {
   });
 
   if (!isExist) {
-    throw new ApiError(404, 'Lesson/Module not found');
+    throw new ApiError(404, "Lesson/Module not found");
   }
 
   return await prisma.courseLectureGenerator.update({
@@ -1266,7 +1267,7 @@ const updateQuiz = async (id: string, payload: any) => {
   });
 
   if (!isExist) {
-    throw new ApiError(404, 'Quiz question not found');
+    throw new ApiError(404, "Quiz question not found");
   }
 
   return await prisma.quizQuestion.update({
@@ -1288,7 +1289,7 @@ const deleteQuiz = async (id: string) => {
   });
 
   if (!isExist) {
-    throw new ApiError(404, 'Quiz question not found');
+    throw new ApiError(404, "Quiz question not found");
   }
 
   return await prisma.quizQuestion.delete({
@@ -1302,7 +1303,7 @@ const deleteCourse = async (id: string) => {
   });
 
   if (!isExist) {
-    throw new ApiError(404, 'Course not found');
+    throw new ApiError(404, "Course not found");
   }
 
   return await prisma.courseNameGenerator.delete({
@@ -1327,18 +1328,18 @@ const getStudentPublishedCourses = async (studentId: string) => {
     },
     include: {
       modules: {
-        orderBy: { moduleNumber: 'asc' },
+        orderBy: { moduleNumber: "asc" },
         include: {
           lessonProgresses: {
             where: { studentId },
           },
           quizQuestions: {
-            orderBy: { questionNumber: 'asc' },
+            orderBy: { questionNumber: "asc" },
           },
         },
       },
       quizzes: {
-        orderBy: { questionNumber: 'asc' },
+        orderBy: { questionNumber: "asc" },
       },
       class: true,
     },
@@ -1436,16 +1437,16 @@ const getTeacherPublishedCourses = async (teacherId: string) => {
     },
     include: {
       modules: {
-        orderBy: { moduleNumber: 'asc' },
+        orderBy: { moduleNumber: "asc" },
         include: {
           lessonProgresses: true,
           quizQuestions: {
-            orderBy: { questionNumber: 'asc' },
+            orderBy: { questionNumber: "asc" },
           },
         },
       },
       quizzes: {
-        orderBy: { questionNumber: 'asc' },
+        orderBy: { questionNumber: "asc" },
       },
       class: true,
     },
@@ -1466,7 +1467,7 @@ const removeTeacherFromCourse = async (courseId: string) => {
   });
 
   if (!isExist) {
-    throw new ApiError(404, 'Course not found');
+    throw new ApiError(404, "Course not found");
   }
 
   return await prisma.courseNameGenerator.update({
@@ -1495,7 +1496,7 @@ const getStudentProgressSummary = async (
       aiCourse: {
         include: {
           modules: {
-            orderBy: { moduleNumber: 'asc' },
+            orderBy: { moduleNumber: "asc" },
             include: {
               lessonProgresses: {
                 where: { studentId },
@@ -1590,25 +1591,25 @@ const getStudentCourseDetails = async (studentId: string, courseId: string) => {
     where: { id: courseId },
     include: {
       modules: {
-        orderBy: { moduleNumber: 'asc' },
+        orderBy: { moduleNumber: "asc" },
         include: {
           lessonProgresses: {
             where: { studentId },
           },
           quizQuestions: {
-            orderBy: { questionNumber: 'asc' },
+            orderBy: { questionNumber: "asc" },
           },
         },
       },
       quizzes: {
-        orderBy: { questionNumber: 'asc' },
+        orderBy: { questionNumber: "asc" },
       },
       class: true,
     },
   });
 
   if (!course) {
-    throw new ApiError(404, 'Course not found');
+    throw new ApiError(404, "Course not found");
   }
 
   const totalModulesCount = course.totalModules;
@@ -1649,7 +1650,7 @@ const getStudentCourseDetails = async (studentId: string, courseId: string) => {
       let quizScore = null;
       let quizResult: any = [];
       let pointsEarned = 0;
-      let correctAnswersCount = '0/0';
+      let correctAnswersCount = "0/0";
       let accuracy = 0;
 
       if (aiUserId && hasQuiz) {
@@ -1731,10 +1732,10 @@ const getStudentCourseDetails = async (studentId: string, courseId: string) => {
     },
     nextModule: nextModule
       ? {
-        id: nextModule.id,
-        title: nextModule.moduleTitle,
-        moduleNumber: nextModule.moduleNumber,
-      }
+          id: nextModule.id,
+          title: nextModule.moduleTitle,
+          moduleNumber: nextModule.moduleNumber,
+        }
       : null,
   };
 };
@@ -1744,15 +1745,15 @@ const getTeacherCourseDetails = async (teacherId: string, courseId: string) => {
     where: { id: courseId },
     include: {
       modules: {
-        orderBy: { moduleNumber: 'asc' },
+        orderBy: { moduleNumber: "asc" },
         include: {
           quizQuestions: {
-            orderBy: { questionNumber: 'asc' },
+            orderBy: { questionNumber: "asc" },
           },
         },
       },
       quizzes: {
-        orderBy: { questionNumber: 'asc' },
+        orderBy: { questionNumber: "asc" },
       },
       class: true,
       enrollments: {
@@ -1764,12 +1765,12 @@ const getTeacherCourseDetails = async (teacherId: string, courseId: string) => {
   });
 
   if (!course) {
-    throw new ApiError(404, 'Course not found');
+    throw new ApiError(404, "Course not found");
   }
 
   // Ensure this course belongs to the teacher
   if (course.teacherId !== teacherId) {
-    throw new ApiError(403, 'You do not have permission to view this course');
+    throw new ApiError(403, "You do not have permission to view this course");
   }
 
   const enrolledStudentIds = course.enrollments.map((e) => e.studentId);
@@ -1889,18 +1890,18 @@ const getStudentPublishedCoursesWithResults = async (studentId: string) => {
     },
     include: {
       modules: {
-        orderBy: { moduleNumber: 'asc' },
+        orderBy: { moduleNumber: "asc" },
         include: {
           lessonProgresses: {
             where: { studentId },
           },
           quizQuestions: {
-            orderBy: { questionNumber: 'asc' },
+            orderBy: { questionNumber: "asc" },
           },
         },
       },
       quizzes: {
-        orderBy: { questionNumber: 'asc' },
+        orderBy: { questionNumber: "asc" },
       },
       class: true,
     },
@@ -1944,7 +1945,7 @@ const getStudentPublishedCoursesWithResults = async (studentId: string) => {
           let quizScore = null;
           let quizResult: any = [];
           let pointsEarned = 0;
-          let correctAnswersCount = '0/0';
+          let correctAnswersCount = "0/0";
           let accuracy = 0;
 
           if (aiUserId) {
@@ -2018,21 +2019,20 @@ const getStudentPublishedCoursesWithResults = async (studentId: string) => {
   return result;
 };
 
-
 // GET SINGLE MODULE BY ID
 const getModuleById = async (id: string) => {
   const result = await prisma.courseLectureGenerator.findUnique({
     where: { id },
     include: {
       quizQuestions: {
-        orderBy: { questionNumber: 'asc' },
+        orderBy: { questionNumber: "asc" },
       },
       // lessonProgresses: true,
     },
   });
 
   if (!result) {
-    throw new ApiError(404, 'Module not found');
+    throw new ApiError(404, "Module not found");
   }
 
   return result;
@@ -2046,7 +2046,7 @@ const getQuizzesByIds = async (ids: string[]) => {
         in: ids,
       },
     },
-    orderBy: { questionNumber: 'asc' },
+    orderBy: { questionNumber: "asc" },
   });
 
   return result;
