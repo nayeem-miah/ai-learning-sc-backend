@@ -20,6 +20,20 @@ const aiClient = axios.create({
 });
 
 // ── Error helper
+const getAIStatusCode = (err: unknown, fallback = 502): number => {
+  if (err instanceof AxiosError) {
+    if (typeof err.response?.status === "number") {
+      return err.response.status;
+    }
+
+    if (err.code === "ECONNABORTED") {
+      return 504;
+    }
+  }
+
+  return fallback;
+};
+
 const getAIError = (err: unknown, fallback: string): string => {
   if (err instanceof AxiosError) {
     return (
@@ -55,33 +69,65 @@ const generateUserIdFromAI = async (): Promise<{
 // STEP 2 — Generate Course from AI
 const generateCourseFromAI = async (
   payload: TCourseFromAi,
+  maxRetries = 2, // Allow up to 2 retries by default
 ): Promise<{
   unique_session_id: string;
   name_of_the_course: string;
   unique_id: string;
   data: any;
 }> => {
-  const response = await aiClient.post("/api/v1/course/generate", payload);
+  let lastError: unknown;
 
-  const result = response.data;
-  if (!result?.unique_session_id) {
-    throw new ApiError(
-      502,
-      "AI did not return a valid unique_session_id from course generate",
-    );
+  for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+    try {
+      const response = await aiClient.post("/api/v1/course/generate", payload);
+
+      const result = response.data;
+      if (!result?.unique_session_id) {
+        throw new ApiError(
+          502,
+          "AI did not return a valid unique_session_id from course generate",
+        );
+      }
+
+      // Success! Return the data.
+      return {
+        unique_session_id: result.unique_session_id,
+        name_of_the_course: result.name_of_the_course,
+        unique_id: result.unique_id,
+        data: result.data ?? null,
+      };
+    } catch (err) {
+      lastError = err;
+      const statusCode = getAIStatusCode(err, 502);
+
+      // Retry on 502, 503, 504 or network timeout
+      const isRetryable =
+        [502, 503, 504].includes(statusCode) ||
+        (err instanceof AxiosError && err.code === "ECONNABORTED");
+
+      if (isRetryable && attempt <= maxRetries) {
+        console.warn(
+          `[Attempt ${attempt}/${maxRetries + 1}] AI Course Generation failed (${statusCode}). Retrying in 5 seconds...`,
+        );
+        await new Promise((res) => setTimeout(res, 5000)); // Wait 5s before retrying
+        continue;
+      }
+
+      // If it's not retryable, or we've run out of retries, throw a clean ApiError
+      throw new ApiError(
+        statusCode,
+        `[Step 2] Course generation failed: ${err instanceof Error ? err.message : "Unknown AI Error"}`,
+      );
+    }
   }
 
-  return {
-    unique_session_id: result.unique_session_id,
-    name_of_the_course: result.name_of_the_course,
-    unique_id: result.unique_id,
-    data: result.data ?? null,
-  };
+  throw new ApiError(504, "AI Course Generation failed after maximum retries.");
 };
-
 // STEP 3 — Generate Single Module from AI (called in loop)
 const generateModuleFromAI = async (
   payload: any,
+  maxRetries = 3,
 ): Promise<{
   module_number: number;
   title: string;
@@ -90,27 +136,56 @@ const generateModuleFromAI = async (
   voice: any;
   total_modules: number;
 }> => {
-  const response = await aiClient.post(
-    "/api/v1/course-lecture/generate-module",
-    payload,
-  );
+  let lastError: unknown;
 
-  const result = response.data;
-  const module = result?.module;
+  for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+    try {
+      const response = await aiClient.post(
+        "/api/v1/course-lecture/generate-module",
+        payload,
+      );
 
-  return {
-    module_number: module?.module_number ?? payload.module_number,
-    title: module?.title ?? `Module ${payload.module_number}`,
-    introduction: module?.introduction ?? "",
-    study_topics: module?.study_topics ?? [],
-    voice: module?.voice ?? null,
-    total_modules: result?.total_modules ?? 0,
-  };
+      const result = response.data;
+      const module = result?.module;
+
+      return {
+        module_number: module?.module_number ?? payload.module_number,
+        title: module?.title ?? `Module ${payload.module_number}`,
+        introduction: module?.introduction ?? "",
+        study_topics: module?.study_topics ?? [],
+        voice: module?.voice ?? null,
+        total_modules: result?.total_modules ?? 0,
+      };
+    } catch (err) {
+      lastError = err;
+      const statusCode = getAIStatusCode(err, 502);
+
+      const isRetryable =
+        [502, 503, 504].includes(statusCode) ||
+        (err instanceof AxiosError && err.code === "ECONNABORTED");
+
+      if (isRetryable && attempt <= maxRetries) {
+        console.warn(
+          `[Attempt ${attempt}/${maxRetries + 1}] AI Module Generation failed (${statusCode}). Retrying in 5 seconds...`,
+        );
+        await new Promise((res) => setTimeout(res, 5000)); // Wait 5s before retrying
+        continue;
+      }
+
+      throw new ApiError(
+        statusCode,
+        `[Step 3] Module generation failed: ${err instanceof Error ? err.message : "Unknown AI Error"}`,
+      );
+    }
+  }
+
+  throw new ApiError(504, "AI Module Generation failed after maximum retries.");
 };
 
 // QUIZ GENERATE — Delegate entirely to AI
 const generateQuizFromAI = async (
   payload: any,
+  maxRetries = 3,
 ): Promise<{
   success: boolean;
   quiz_questions: {
@@ -121,18 +196,46 @@ const generateQuizFromAI = async (
   }[];
   total_questions: number;
 }> => {
-  const response = await aiClient.post("/api/v1/quiz/generate", payload);
+  let lastError: unknown;
 
-  const result = response.data;
-  if (!result?.quiz_questions) {
-    throw new ApiError(502, "AI did not return valid quiz questions");
+  for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+    try {
+      const response = await aiClient.post("/api/v1/quiz/generate", payload);
+
+      const result = response.data;
+      if (!result?.quiz_questions) {
+        throw new ApiError(502, "AI did not return valid quiz questions");
+      }
+
+      return {
+        success: result.success ?? true,
+        quiz_questions: result.quiz_questions,
+        total_questions: result.total_questions ?? result.quiz_questions.length,
+      };
+    } catch (err) {
+      lastError = err;
+      const statusCode = getAIStatusCode(err, 502);
+
+      const isRetryable =
+        [502, 503, 504].includes(statusCode) ||
+        (err instanceof AxiosError && err.code === "ECONNABORTED");
+
+      if (isRetryable && attempt <= maxRetries) {
+        console.warn(
+          `[Attempt ${attempt}/${maxRetries + 1}] AI Quiz Generation failed (${statusCode}). Retrying in 5 seconds...`,
+        );
+        await new Promise((res) => setTimeout(res, 5000));
+        continue;
+      }
+
+      throw new ApiError(
+        statusCode,
+        `[Step 3] Quiz generation failed: ${err instanceof Error ? err.message : "Unknown AI Error"}`,
+      );
+    }
   }
 
-  return {
-    success: result.success ?? true,
-    quiz_questions: result.quiz_questions,
-    total_questions: result.total_questions ?? result.quiz_questions.length,
-  };
+  throw new ApiError(504, "AI Quiz Generation failed after maximum retries.");
 };
 
 // SUBMIT ANSWER — Delegate to AI
@@ -196,7 +299,7 @@ const courseSetup = async (body: TCourseSetupPayload) => {
     userResult = await generateUserIdFromAI();
   } catch (err) {
     throw new ApiError(
-      502,
+      getAIStatusCode(err),
       `[Step 1] Failed to generate User ID from AI: ${getAIError(err, "Unknown error")}`,
     );
   }
@@ -217,7 +320,7 @@ const courseSetup = async (body: TCourseSetupPayload) => {
     });
   } catch (err) {
     throw new ApiError(
-      502,
+      getAIStatusCode(err),
       `[Step 2] Failed to generate Course from AI: ${getAIError(err, "Unknown error")}`,
     );
   }
@@ -262,7 +365,7 @@ const courseSetup = async (body: TCourseSetupPayload) => {
       console.log("generated module ----------------------", i);
     } catch (err) {
       throw new ApiError(
-        502,
+        getAIStatusCode(err),
         `[Step 3] Module ${i}/${totalModules} generation failed: ${getAIError(err, "Unknown error")}. No data was saved to the database. Please retry.`,
       );
     }
@@ -288,7 +391,7 @@ const courseSetup = async (body: TCourseSetupPayload) => {
       });
     } catch (err) {
       throw new ApiError(
-        502,
+        getAIStatusCode(err),
         `[Step 3] Quiz generation for Module ${i}/${totalModules} failed: ${getAIError(err, "Unknown error")}. No data was saved to the database. Please retry.`,
       );
     }
@@ -656,7 +759,7 @@ const generateQuiz = async (body: {
     };
   } catch (err) {
     throw new ApiError(
-      502,
+      getAIStatusCode(err),
       `Failed to generate quiz from AI: ${getAIError(err, "Unknown error")}`,
     );
   }
@@ -712,7 +815,7 @@ const submitQuizAnswer = async (body: {
     };
   } catch (err) {
     throw new ApiError(
-      502,
+      getAIStatusCode(err),
       `Failed to submit answer to AI: ${getAIError(err, "Unknown error")}`,
     );
   }
@@ -726,7 +829,7 @@ const getQuizResults = async (body: {
     return await getQuizResultsFromAI(body);
   } catch (err) {
     throw new ApiError(
-      502,
+      getAIStatusCode(err),
       `Failed to get quiz results from AI: ${getAIError(err, "Unknown error")}`,
     );
   }
