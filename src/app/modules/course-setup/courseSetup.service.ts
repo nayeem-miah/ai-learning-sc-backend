@@ -16,7 +16,7 @@ const AI_BASE =
 const aiClient = axios.create({
   baseURL: AI_BASE,
   headers: { "Content-Type": "application/json" },
-  timeout: 600000,
+  timeout: 3600000, //
 });
 
 // ── Error helper
